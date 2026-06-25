@@ -49,11 +49,37 @@ export const BidPanel: React.FC<BidPanelProps> = ({
     return choisirEnchere(main, variante, meilleureEnchere as any, 'expert');
   }, [main, variante, meilleureEnchere, modeApprentissage]);
 
+  // Détection du Trou (3 As) ou Trou Royal (4 As) - Obligatoire au Whist de Gand
+  const forceTrou = React.useMemo(() => {
+    if (variante.id !== 'whist-gand') return null;
+    const nbAs = main.filter(c => c.valeur === 14).length;
+    if (nbAs === 3) return 'trou';
+    if (nbAs === 4) return 'trou_royal';
+    return null;
+  }, [main, variante]);
+
   // Contrats disponibles (priorité > enchère actuelle)
-  const contratsDisponibles = variante.contrats.filter(c =>
-    c.id !== 'passe' &&
-    c.priorite > (meilleureEnchere?.priorite ?? -1),
-  );
+  const contratsDisponibles = variante.contrats.filter(c => {
+    if (c.id === 'passe') return false;
+
+    // Si on a 3 ou 4 As, on ne peut choisir QUE le Trou correspondant
+    if (forceTrou) {
+      return c.id === forceTrou;
+    }
+
+    return c.priorite > (meilleureEnchere?.priorite ?? -1);
+  });
+
+  // Si on est forcé de jouer Trou, on sélectionne le contrat immédiatement
+  React.useEffect(() => {
+    if (forceTrou && !contratSel) {
+      const c = variante.contrats.find(v => v.id === forceTrou);
+      if (c) {
+        setContratSel(c);
+        setEtape('as'); // Aller directement au choix de l'As partenaire
+      }
+    }
+  }, [forceTrou, contratSel, variante]);
 
   const handleSelContrat = (contrat: ContratConfig) => {
     setContratSel(contrat);
@@ -70,7 +96,15 @@ export const BidPanel: React.FC<BidPanelProps> = ({
 
   const handleConfirmer = () => {
     if (!contratSel) return;
-    onEnchere(contratSel.id, atoutSel ?? undefined, asPartenaireSel ?? undefined);
+
+    // Pour le Trou, l'atout est la couleur de l'As demandé
+    let atoutFinal = atoutSel;
+    if ((contratSel.id === 'trou' || contratSel.id === 'trou_royal') && asPartenaireSel) {
+      atoutFinal = asPartenaireSel.couleur;
+    }
+
+    onEnchere(contratSel.id, atoutFinal ?? undefined, asPartenaireSel ?? undefined);
+
     // Reset
     setContratSel(null);
     setAtoutSel(null);
@@ -84,14 +118,22 @@ export const BidPanel: React.FC<BidPanelProps> = ({
     (contratSel.sanAtout || !variante.atoutChoisi || atoutSel !== null) &&
     (!contratSel.partenaire || asPartenaireSel !== null);
 
-  // As disponibles pour la Demande (As que le joueur ne possède pas)
-  const asDisponibles: { couleur: Couleur; carte: Carte }[] = [
-    Couleur.PIQUE, Couleur.COEUR, Couleur.CARREAU, Couleur.TREFLE,
-  ].flatMap(col => {
-    const asInMain = main.find(c => c.valeur === 14 && c.couleur === col);
-    if (asInMain) return []; // on ne peut pas désigner son propre As
-    return [{ couleur: col, carte: { id: `14_${col}`, valeur: 14 as any, couleur: col } }];
-  });
+  // Cartes disponibles pour désigner le partenaire (As ou Roi de Cœur pour Trou Royal)
+  const cartesPartenairesDisponibles = React.useMemo(() => {
+    if (contratSel?.id === 'trou_royal') {
+      // Pour Trou Royal, on cherche le Roi de Cœur par défaut
+      const roiCoeurInMain = main.find(c => c.valeur === 13 && c.couleur === Couleur.COEUR);
+      if (roiCoeurInMain) return [];
+      return [{ couleur: Couleur.COEUR, carte: { id: `13_${Couleur.COEUR}`, valeur: 13 as any, couleur: Couleur.COEUR }, label: 'Roi' }];
+    }
+
+    // Sinon (Demande / Trou), on cherche les As manquants
+    return [Couleur.PIQUE, Couleur.COEUR, Couleur.CARREAU, Couleur.TREFLE].flatMap(col => {
+      const asInMain = main.find(c => c.valeur === 14 && c.couleur === col);
+      if (asInMain) return [];
+      return [{ couleur: col, carte: { id: `14_${col}`, valeur: 14 as any, couleur: col }, label: 'As' }];
+    });
+  }, [main, contratSel]);
 
   return (
     <View style={styles.container}>
@@ -193,25 +235,27 @@ export const BidPanel: React.FC<BidPanelProps> = ({
           </View>
         )}
 
-        {/* ── Étape 3 : Choisir l'As (Demande) ───── */}
-        {contratSel?.partenaire && asDisponibles.length > 0 && (
+        {/* ── Étape 3 : Choisir l'As (Demande/Trou) ───── */}
+        {contratSel?.partenaire && cartesPartenairesDisponibles.length > 0 && (
           <View style={styles.section}>
-            <Text style={styles.sectionLabel}>Désigner l'As partenaire</Text>
+            <Text style={styles.sectionLabel}>
+              Désigner {contratSel.id === 'trou_royal' ? "le Roi" : "l'As"} partenaire
+            </Text>
             <Text style={styles.asInfo}>
-              Le porteur de cet As sera votre partenaire secret.
+              Le porteur de cette carte sera votre partenaire secret.
             </Text>
             <View style={styles.atoutRow}>
-              {asDisponibles.map(({ couleur, carte }) => (
+              {cartesPartenairesDisponibles.map(({ couleur, carte, label }) => (
                 <TouchableOpacity
                   key={couleur}
-                  style={[styles.atoutBtn, asPartenaireSel?.couleur === couleur && styles.atoutBtnSel]}
+                  style={[styles.atoutBtn, asPartenaireSel?.id === carte.id && styles.atoutBtnSel]}
                   onPress={() => setAsPartenaireSel(carte)}
                 >
                   <Text style={[
                     styles.atoutSym,
                     estRouge(couleur) ? styles.symRouge : styles.symNoir,
                   ]}>
-                    A{SYMBOLE[couleur]}
+                    {label[0]}{SYMBOLE[couleur]}
                   </Text>
                 </TouchableOpacity>
               ))}
@@ -234,8 +278,14 @@ export const BidPanel: React.FC<BidPanelProps> = ({
             </TouchableOpacity>
           )}
 
-          <TouchableOpacity style={styles.btnPasse} onPress={onPasse}>
-            <Text style={styles.btnPasseTexte}>Passer</Text>
+          <TouchableOpacity
+            style={[styles.btnPasse, forceTrou && styles.btnDisabled]}
+            onPress={onPasse}
+            disabled={!!forceTrou}
+          >
+            <Text style={styles.btnPasseTexte}>
+              {forceTrou ? "Trou Obligatoire" : "Passer"}
+            </Text>
           </TouchableOpacity>
         </View>
 

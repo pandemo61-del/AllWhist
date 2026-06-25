@@ -53,6 +53,16 @@ export const WhistGand: VariantConfig = {
       priorite: 2,
     },
     {
+      id: 'trou_royal',
+      nom: 'Trou Royal',
+      description: 'Obligatoire avec 4 As. Faire 9 plis avec le détenteur du Roi de Cœur.',
+      plisMin: 9, plisMax: 13,
+      seul: false, partenaire: true,
+      pointsReussite: 32, pointsEchec: 32,
+      sanAtout: false, cartesVisibles: false,
+      priorite: 3,
+    },
+    {
       id: 'solo',
       nom: 'Solo',
       description: 'Faire 6 plis seul contre les 3 autres.',
@@ -60,7 +70,7 @@ export const WhistGand: VariantConfig = {
       seul: true, partenaire: false,
       pointsReussite: 12, pointsEchec: 12,
       sanAtout: false, cartesVisibles: false,
-      priorite: 3,
+      priorite: 4,
     },
     {
       id: 'abondance',
@@ -70,7 +80,7 @@ export const WhistGand: VariantConfig = {
       seul: true, partenaire: false,
       pointsReussite: 32, pointsEchec: 32,
       sanAtout: false, cartesVisibles: false,
-      priorite: 4,
+      priorite: 5,
     },
     {
       id: 'misere',
@@ -80,7 +90,7 @@ export const WhistGand: VariantConfig = {
       seul: true, partenaire: false,
       pointsReussite: 36, pointsEchec: 36,
       sanAtout: true, cartesVisibles: false,
-      priorite: 5,
+      priorite: 6,
     },
     {
       id: 'abondance_declaree',
@@ -90,7 +100,7 @@ export const WhistGand: VariantConfig = {
       seul: true, partenaire: false,
       pointsReussite: 100, pointsEchec: 100,
       sanAtout: false, cartesVisibles: false,
-      priorite: 6,
+      priorite: 7,
     },
     {
       id: 'misere_ouverte',
@@ -100,7 +110,7 @@ export const WhistGand: VariantConfig = {
       seul: true, partenaire: false,
       pointsReussite: 75, pointsEchec: 75,
       sanAtout: true, cartesVisibles: true,
-      priorite: 7,
+      priorite: 8,
     },
   ],
   nbJoueurs: 4,

@@ -60,24 +60,48 @@ export function analyserPli(
 
     // --- ANALYSE : COUPER SUR SON PARTENAIRE ---
     if (partenaireEnTete && atout && carte.couleur === atout && meilleurActuel.carte.couleur !== atout) {
-      commentaires.push({
-        type: 'error',
-        titre: 'Coupe fratricide',
-        description: `${joueursNoms[joueurId]} a coupé alors que son partenaire ${joueursNoms[prevJoueurId]} avait déjà le pli. C'est une perte d'atout inutile !`,
-        joueurId
-      });
-    }
+      const estMisere = contrat.id.includes('misere');
 
-    // --- ANALYSE : SURMONTER SON PARTENAIRE INUTILEMENT ---
-    if (partenaireEnTete && carte.valeur > meilleurActuel.carte.valeur && carte.couleur === meilleurActuel.carte.couleur) {
-      // Si c'est le dernier joueur ou s'il n'y a pas de risque de l'adversaire
-      if (i === 3 || !peutEtreBattu(meilleurActuel.carte, pli, atout)) {
+      // On ne signale l'erreur que si ce n'est pas une misère ET que le joueur
+      // avait potentiellement d'autres options (on ne peut pas savoir avec certitude
+      // sans la main, mais on peut atténuer le message ou l'éviter si c'est la fin de partie)
+      // Règle : Si c'est un des 3 derniers plis, les mains sont souvent réduites à une seule couleur
+      const estFinDeManche = pli.numero >= 10;
+
+      if (!estMisere && !estFinDeManche) {
         commentaires.push({
-          type: 'warning',
-          titre: 'Surpasse inutile',
-          description: `${joueursNoms[joueurId]} a joué une carte plus forte que son partenaire inutilement. Mieux vaut garder ses grosses cartes.`,
+          type: 'error',
+          titre: 'Coupe fratricide',
+          description: `${joueursNoms[joueurId]} a coupé alors que son partenaire ${joueursNoms[prevJoueurId]} avait déjà le pli. C'est une perte d'atout inutile !`,
           joueurId
         });
+      }
+    }
+
+    // --- ANALYSE : SURMONTER SON PARTENAIRE ---
+    if (partenaireEnTete && carte.valeur > meilleurActuel.carte.valeur && carte.couleur === meilleurActuel.carte.couleur) {
+      const estMisere = contrat.id.includes('misere');
+
+      if (estMisere) {
+        // En misère, se débarrasser d'une grosse carte sur un pli gagné par un partenaire est un bon coup !
+        if (carte.valeur >= 10) {
+          commentaires.push({
+            type: 'good',
+            titre: 'Défausse de sécurité',
+            description: `${joueursNoms[joueurId]} profite du pli de son partenaire pour se débarrasser d'une grosse carte dangereuse.`,
+            joueurId
+          });
+        }
+      } else {
+        // Hors misère, c'est effectivement une surpasse inutile
+        if (i === 3 || !peutEtreBattu(meilleurActuel.carte, pli, atout)) {
+          commentaires.push({
+            type: 'warning',
+            titre: 'Surpasse inutile',
+            description: `${joueursNoms[joueurId]} a joué une carte plus forte que son partenaire inutilement. Mieux vaut garder ses grosses cartes.`,
+            joueurId
+          });
+        }
       }
     }
 

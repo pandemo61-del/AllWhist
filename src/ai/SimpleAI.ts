@@ -235,6 +235,35 @@ export function choisirEnchere(
   meilleureEnchere: ContratConfig | null,
   niveau: NiveauIA,
 ): DecisionEnchere {
+  // --- RÈGLES OBLIGATOIRES (Whist de Gand) ---
+  if (variante.id === 'whist-gand') {
+    const nbAs = main.filter(c => c.valeur === 14).length;
+
+    // Si on a 3 As -> Trou obligatoire
+    if (nbAs === 3) {
+      const asPossedes = main.filter(c => c.valeur === 14).map(c => c.couleur);
+      const asManquant = [Couleur.PIQUE, Couleur.COEUR, Couleur.CARREAU, Couleur.TREFLE]
+        .find(col => !asPossedes.includes(col));
+
+      return {
+        action: 'enchere',
+        contratId: 'trou',
+        atout: asManquant,
+        asPartenaire: asManquant ? `14_${asManquant}` : undefined,
+      };
+    }
+
+    // Si on a 4 As -> Trou Royal obligatoire
+    if (nbAs === 4) {
+      return {
+        action: 'enchere',
+        contratId: 'trou_royal',
+        atout: Couleur.COEUR,
+        asPartenaire: `13_${Couleur.COEUR}`, // Roi de Cœur par convention
+      };
+    }
+  }
+
   const force = evaluerForceMain(main);
   const { couleur: meilleureCol } = couleurLaPlusLongue(main);
   const nbAtouts = cartesParCouleur(main, meilleureCol).length;
