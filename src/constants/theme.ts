@@ -84,16 +84,16 @@ export const FontWeight = {
 // ─── Dimensions des cartes ─────────────────────
 
 export const CardSize = {
-  // Carte en main (taille augmentée pour confort)
+  // Carte en main (taille compacte pour visibilité table)
   hand: {
-    width:  64,
-    height: 90,
-    radius: 8,
+    width:  46,
+    height: 64,
+    radius: 5,
   },
-  // Carte jouée sur la table (bien plus grande)
+  // Carte jouée sur la table (très grande)
   table: {
-    width:  88,
-    height: 124,
+    width:  90,
+    height: 126,
     radius: 12,
   },
   // Carte dos (adversaires)

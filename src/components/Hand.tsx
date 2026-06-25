@@ -110,10 +110,10 @@ export const Hand: React.FC<HandProps> = ({
 
             const diff = index - mid;
 
-            // Paramètres pour un éventail réaliste et uniforme
-            const rotation = diff * (cartes.length > 10 ? 6 : 8);
-            const translateY = Math.abs(diff) * (cartes.length > 10 ? 3 : 5);
-            const spread = (cartes.length > 10 ? 28 : 34);
+            // Paramètres pour un éventail très compact
+            const rotation = diff * (cartes.length > 10 ? 4 : 5);
+            const translateY = Math.abs(diff) * (cartes.length > 10 ? 1 : 2);
+            const spread = (cartes.length > 10 ? 20 : 24);
 
             // On applique le décalage de couleur pour une séparation nette
             const translateX = (diff * spread) + (suitOffsets[index] - totalExtraOffset / 2);
@@ -227,7 +227,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'flex-end',
-    height: 180,
+    height: 120,
     width: SCREEN_WIDTH,
     paddingHorizontal: Spacing.xl,
     overflow: 'visible',
