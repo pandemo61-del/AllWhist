@@ -203,8 +203,6 @@ export default function GameScreen() {
         </View>
       )}
 
-      </View>
-
     </SafeAreaView>
   );
 }
