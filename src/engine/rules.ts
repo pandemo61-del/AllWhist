@@ -116,7 +116,7 @@ export function estRevélationPartenaire(
   contrat: ContratJoue,
 ): boolean {
   return (
-    contrat.id === 'demande' &&
+    (contrat.id === 'demande' || contrat.id === 'trou') &&
     contrat.asPartenaire !== undefined &&
     carte.id === contrat.asPartenaire.id
   );

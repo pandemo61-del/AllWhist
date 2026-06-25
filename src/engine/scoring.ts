@@ -148,6 +148,109 @@ export function calculerScoreBoston(
 
 // ─── Construction du ScoreManche ───────────────
 
+// ─── Score Solo Whist (British) ────────────────
+
+export function calculerScoreSolo(
+  contrat: ContratJoue,
+  plisParJoueur: Record<number, number>,
+): ResultatManche {
+  const reussite = evaluerReussite(contrat, plisParJoueur);
+  const delta: Record<number, number> = {};
+  const joueurIds = Object.keys(plisParJoueur).map(Number);
+
+  // Barème officiel en unités (ex: 1, 2, 3, 4, 6)
+  // On multiplie par 10 pour l'affichage
+  const bareme: Record<string, number> = {
+    proposal: 10,
+    solo: 20,
+    misere: 30,
+    abondance: 40,
+    misere_ouverte: 60,
+    abondance_declaree: 100,
+  };
+
+  const points = bareme[contrat.id] ?? 10;
+
+  if (contrat.id === 'proposal') {
+    // Jeu à deux : les 2 gagnants reçoivent 'points' des 2 perdants
+    const gagnants = [contrat.joueurId, contrat.partenaireId!];
+    const perdants = joueurIds.filter(id => !gagnants.includes(id));
+
+    if (reussite) {
+      gagnants.forEach(id => delta[id] = points);
+      perdants.forEach(id => delta[id] = -points);
+    } else {
+      gagnants.forEach(id => delta[id] = -points);
+      perdants.forEach(id => delta[id] = points);
+    }
+  } else {
+    // Jeu seul contre 3
+    const defenseIds = joueurIds.filter(id => id !== contrat.joueurId);
+    if (reussite) {
+      delta[contrat.joueurId] = points * 3;
+      defenseIds.forEach(id => delta[id] = -points);
+    } else {
+      delta[contrat.joueurId] = -points * 3;
+      defenseIds.forEach(id => delta[id] = points);
+    }
+  }
+
+  const plisTotal = (plisParJoueur[contrat.joueurId] ?? 0) +
+    (contrat.partenaireId !== undefined ? (plisParJoueur[contrat.partenaireId] ?? 0) : 0);
+
+  return {
+    reussite,
+    plisJoueurEtPartenaire: plisTotal,
+    deltaScores: delta,
+    details: reussite ? `✓ ${contrat.nom} réussi` : `✗ ${contrat.nom} chute`,
+  };
+}
+
+// ─── Score Bid Whist ───────────────────────────
+
+export function calculerScoreBidWhist(
+  contrat: ContratJoue,
+  plisParJoueur: Record<number, number>,
+): ResultatManche {
+  const reussite = evaluerReussite(contrat, plisParJoueur);
+  const delta: Record<number, number> = {};
+
+  // Équipes fixes 0/2 vs 1/3
+  const equipeA = [0, 2];
+  const equipeB = [1, 3];
+  const estEquipeA = equipeA.includes(contrat.joueurId);
+
+  const plisEquipeA = (plisParJoueur[0] ?? 0) + (plisParJoueur[2] ?? 0);
+  const plisEquipeB = (plisParJoueur[1] ?? 0) + (plisParJoueur[3] ?? 0);
+
+  let scoreA = 0;
+  let scoreB = 0;
+
+  if (reussite) {
+    // Gagnant : 1 pt par pli au-delà de 6
+    const pts = (estEquipeA ? plisEquipeA : plisEquipeB) - 6;
+    const finalPts = contrat.sanAtout ? pts * 2 : pts;
+    if (estEquipeA) scoreA = finalPts; else scoreB = finalPts;
+  } else {
+    // Perdant : perd le montant de l'enchère (plisObjectif - 6)
+    const enchere = contrat.plisObjectif - 6;
+    const finalLoss = contrat.sanAtout ? enchere * 2 : enchere;
+    if (estEquipeA) scoreA = -finalLoss; else scoreB = -finalLoss;
+  }
+
+  equipeA.forEach(id => delta[id] = scoreA);
+  equipeB.forEach(id => delta[id] = scoreB);
+
+  return {
+    reussite,
+    plisJoueurEtPartenaire: estEquipeA ? plisEquipeA : plisEquipeB,
+    deltaScores: delta,
+    details: reussite ? `✓ Contrat rempli (+${estEquipeA ? scoreA : scoreB})` : `✗ Chute (${estEquipeA ? scoreA : scoreB})`,
+  };
+}
+
+// ─── Construction du ScoreManche ───────────────
+
 export function construireScoreManche(
   manche: number,
   contrat: ContratJoue,
