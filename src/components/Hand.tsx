@@ -54,14 +54,16 @@ export const Hand: React.FC<HandProps> = ({
   };
 
   const handlePress = useCallback((carte: Carte) => {
-    if (!peutJouer) return;
-    if (!jouablesIds.has(carte.id)) return;
-
+    // On permet la sélection même si on ne peut pas jouer (pour voir les détails)
     if (carteSelectionnee === carte.id) {
-      // Animation avant de confirmer
-      setCarteSelectionnee(null);
-      // On laisse un petit délai pour que l'action soit visible
-      setTimeout(() => onJouerCarte(carte), 100);
+      if (peutJouer && jouablesIds.has(carte.id)) {
+        // Animation avant de confirmer
+        setCarteSelectionnee(null);
+        // On laisse un petit délai pour que l'action soit visible
+        setTimeout(() => onJouerCarte(carte), 100);
+      } else {
+        setCarteSelectionnee(null);
+      }
     } else {
       setCarteSelectionnee(carte.id);
     }

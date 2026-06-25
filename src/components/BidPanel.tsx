@@ -11,7 +11,6 @@ import { Carte, Couleur } from '../engine/types';
 import { ContratConfig, VariantConfig } from '../variants/types';
 import { SYMBOLE, estRouge } from '../engine/deck';
 import { choisirEnchere } from '../ai/SimpleAI';
-import { Hand } from './Hand';
 import {
   Colors, Spacing, FontSize, FontWeight, Radius,
 } from '../constants/theme';
@@ -138,16 +137,6 @@ export const BidPanel: React.FC<BidPanelProps> = ({
           </Text>
         </View>
       )}
-
-      {/* ── Main du joueur (pour décider) ─────── */}
-      <View style={styles.mainContainer}>
-        <Hand
-          cartes={main}
-          cartesJouables={[]}
-          onJouerCarte={() => {}}
-          phase="encheres"
-        />
-      </View>
 
       <ScrollView showsVerticalScrollIndicator={false}>
 

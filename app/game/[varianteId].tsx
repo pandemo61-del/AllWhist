@@ -162,17 +162,6 @@ export default function GameScreen() {
               />
             )}
 
-            {/* Main du joueur humain */}
-            {phase === 'jeu' && (
-              <Hand
-                cartes={joueurs[0]?.main ?? []}
-                cartesJouables={cartesJouablesHumain()}
-                onJouerCarte={handleJouerCarte}
-                phase={tourDeJoueur === 0 ? 'jeu' : 'attente'}
-                cartesVisibles={contratEnCours?.cartesVisibles}
-              />
-            )}
-
             {/* Contrat info overlay (misère ouverte) */}
             {contratEnCours?.cartesVisibles && (
               <View style={styles.misereOuverte}>
@@ -195,6 +184,24 @@ export default function GameScreen() {
             partieTerminee={partieTerminee}
           />
         )}
+
+      </View>
+
+      {/* Main du joueur humain (Toujours visible pendant le jeu/enchères) */}
+      {(phase === 'encheres' || phase === 'jeu' || phase === 'fin_pli' || phase === 'annonce_contrat') && (
+        <View style={styles.mainConteneurFixe}>
+          <Hand
+            cartes={joueurs[0]?.main ?? []}
+            cartesJouables={phase === 'jeu' ? cartesJouablesHumain() : []}
+            onJouerCarte={handleJouerCarte}
+            phase={
+              phase === 'encheres' ? 'encheres' :
+              (tourDeJoueur === 0 && phase === 'jeu' ? 'jeu' : 'attente')
+            }
+            cartesVisibles={contratEnCours?.cartesVisibles}
+          />
+        </View>
+      )}
 
       </View>
 
@@ -291,6 +298,14 @@ const styles = StyleSheet.create({
     fontSize: FontSize.xs,
     color: Colors.warning,
     fontWeight: FontWeight.medium,
+  },
+
+  // Fixation de la main
+  mainConteneurFixe: {
+    borderTopWidth: 0.5,
+    borderTopColor: Colors.border,
+    paddingBottom: Spacing.md,
+    backgroundColor: Colors.bg,
   },
 
   // Erreur
