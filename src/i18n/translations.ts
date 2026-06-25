@@ -168,7 +168,7 @@ export const translations: Record<Langue, any> = {
       }
     },
     learn: {
-      tabs: { regles: 'Règles', contrats: 'Contrats', conseils: 'Conseils' },
+      tabs: { regles: 'Règles', contrats: 'Contrats', conseils: 'Conseils', scenarios: 'Pratique' },
       objective: 'Objectif', trick: 'pli', tricks: 'plis', points: 'pts',
       playsSolo: 'Joue seul', withPartner: 'Avec partenaire', noTrump: 'Sans atout',
       visibleCards: 'Cartes visibles', failure: 'Échec',
@@ -322,7 +322,7 @@ export const translations: Record<Langue, any> = {
       }
     },
     learn: {
-      tabs: { regles: 'Rules', contrats: 'Contracts', conseils: 'Tips' },
+      tabs: { regles: 'Rules', contrats: 'Contracts', conseils: 'Tips', scenarios: 'Practice' },
       objective: 'Objective', trick: 'trick', tricks: 'tricks', points: 'pts',
       playsSolo: 'Plays alone', withPartner: 'With partner', noTrump: 'No trump',
       visibleCards: 'Visible cards', failure: 'Failure',
@@ -471,7 +471,7 @@ export const translations: Record<Langue, any> = {
       }
     },
     learn: {
-      tabs: { regles: 'Regels', contrats: 'Contracten', conseils: 'Tips' },
+      tabs: { regles: 'Regels', contrats: 'Contracten', conseils: 'Tips', scenarios: 'Oefening' },
       objective: 'Doel', trick: 'slag', tricks: 'slagen', points: 'pt',
       playsSolo: 'Speelt alleen', withPartner: 'Met partner', noTrump: 'Zonder troef',
       visibleCards: 'Zichtbare kaarten', failure: 'Mislukking',
@@ -610,7 +610,7 @@ export const translations: Record<Langue, any> = {
       }
     },
     learn: {
-      tabs: { regles: 'Regeln', contrats: 'Kontrakte', conseils: 'Tipps' },
+      tabs: { regles: 'Regeln', contrats: 'Kontrakte', conseils: 'Tipps', scenarios: 'Übung' },
       objective: 'Ziel', trick: 'Stich', tricks: 'Stiche', points: 'Pkt',
       playsSolo: 'Spielt allein', withPartner: 'Mit Partner', noTrump: 'Ohne Trumpf',
       visibleCards: 'Offene Karten', failure: 'Fehlwurf',
@@ -749,7 +749,7 @@ export const translations: Record<Langue, any> = {
       }
     },
     learn: {
-      tabs: { regles: 'Reglas', contrats: 'Contratos', conseils: 'Consejos' },
+      tabs: { regles: 'Reglas', contrats: 'Contratos', conseils: 'Consejos', scenarios: 'Práctica' },
       objective: 'Objetivo', trick: 'baza', tricks: 'bazas', points: 'ptos',
       playsSolo: 'Juega solo', withPartner: 'Con compañero', noTrump: 'Sin triunfo',
       visibleCards: 'Cartes visibles', failure: 'Fallo',
@@ -888,7 +888,7 @@ export const translations: Record<Langue, any> = {
       }
     },
     learn: {
-      tabs: { regles: 'Regras', contrats: 'Contratos', conseils: 'Dicas' },
+      tabs: { regles: 'Regras', contrats: 'Contratos', conseils: 'Dicas', scenarios: 'Prática' },
       objective: 'Objetivo', trick: 'vaza', tricks: 'vazas', points: 'pts',
       playsSolo: 'Joga sozinho', withPartner: 'Com parceiro', noTrump: 'Sem trunfo',
       visibleCards: 'Cartas visíveis', failure: 'Falha',

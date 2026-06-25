@@ -35,6 +35,7 @@ export default function GameScreen() {
     tourDeJoueur,
     partenaireRévélé,
     historiqueManches,
+    estScenario,
     jouerCarte,
     placerEnchere,
     passerEnchere,
@@ -94,8 +95,17 @@ export default function GameScreen() {
           <Text style={styles.btnQuitterTexte}>✕</Text>
         </TouchableOpacity>
         <View style={styles.topInfo}>
-          <Text style={styles.topVariante}>{variante.nom}</Text>
-          <Text style={styles.topManche}>Manche {manche} / 13</Text>
+          <View style={styles.topTitleRow}>
+            <Text style={styles.topVariante}>{variante.nom}</Text>
+            {estScenario && (
+              <View style={styles.badgeEntrainement}>
+                <Text style={styles.badgeEntrainementTexte}>Entraînement</Text>
+              </View>
+            )}
+          </View>
+          <Text style={styles.topManche}>
+            {estScenario ? "Partie pédagogique" : `Manche ${manche} / 13`}
+          </Text>
         </View>
         {/* Scores compacts */}
         <View style={styles.scoresRow}>
@@ -103,7 +113,7 @@ export default function GameScreen() {
             <View key={j.id} style={styles.scoreBadge}>
               <Text style={styles.scoreNom}>{j.id === 0 ? 'Vous' : j.nom.slice(0, 3)}</Text>
               <Text style={[styles.scoreVal, j.id === 0 && styles.scoreValHumain]}>
-                {scores[j.id]}
+                {estScenario ? '—' : scores[j.id]}
               </Text>
             </View>
           ))}
@@ -240,6 +250,25 @@ const styles = StyleSheet.create({
     color: Colors.textMuted,
   },
   topInfo: { flex: 1 },
+  topTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.xs,
+  },
+  badgeEntrainement: {
+    backgroundColor: Colors.warning + '22',
+    paddingHorizontal: 6,
+    paddingVertical: 1,
+    borderRadius: Radius.sm,
+    borderWidth: 0.5,
+    borderColor: Colors.warning,
+  },
+  badgeEntrainementTexte: {
+    fontSize: 9,
+    color: Colors.warning,
+    fontWeight: FontWeight.bold,
+    textTransform: 'uppercase',
+  },
   topVariante: {
     fontSize: FontSize.sm,
     fontWeight: FontWeight.semibold,

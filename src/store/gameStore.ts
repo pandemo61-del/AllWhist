@@ -23,6 +23,8 @@ import { choisirCarte, choisirEnchere, NiveauIA } from '../ai/SimpleAI';
 import { translations } from '../i18n/translations';
 import { useSettingsStore } from './settingsStore';
 
+import { Scenario } from '../data/scenarios';
+
 // ─── Types du store ────────────────────────────
 
 interface GameStore extends EtatPartie {
@@ -30,6 +32,9 @@ interface GameStore extends EtatPartie {
 
   /** Initialise une nouvelle partie avec la variante donnée. */
   initialiserPartie: (varianteId: string, nomJoueur?: string) => void;
+
+  /** Initialise une partie à partir d'un scénario prédéfini. */
+  chargerScenario: (scenario: Scenario, nomJoueur?: string) => void;
 
   /** Le joueur humain joue une carte. */
   jouerCarte: (carte: Carte) => void;
@@ -83,6 +88,7 @@ const ETAT_INITIAL: EtatPartie = {
   },
   historiqueManches: [],
   partenaireRévélé: false,
+  estScenario: false,
 };
 
 // ─── Noms IA ───────────────────────────────────
@@ -146,9 +152,55 @@ export const useGameStore = create<GameStore>((set, get) => ({
         passesConsecutifs: 0,
         historique: [],
       },
+      estScenario: false,
     });
 
     // Lancer l'IA si elle commence (ou autoJeu)
+    if (variante.atoutChoisi && ((donneur + 1) % 4 !== 0 || settings.autoJeu)) {
+      setTimeout(() => get()._faireProchaineActionIA(), 600);
+    }
+  },
+
+  chargerScenario(scenario, nomJoueur = 'Vous') {
+    const variante = getVariante(scenario.varianteId);
+    const settings = useSettingsStore.getState();
+    const donneur = 0;
+
+    const joueurs: Joueur[] = Array.from({ length: 4 }, (_, i) => ({
+      id: i,
+      nom: i === 0 ? nomJoueur : NOMS_IA[i - 1],
+      type: i === 0 ? 'humain' : `ia_${NIVEAUX_IA[i - 1]}` as any,
+      main: i === 0
+        ? trierMain(scenario.mains[i], scenario.atoutInitial, {
+            ordreCouleurs: settings.ordreCouleurs,
+            ordreValeur: settings.ordreValeur,
+            direction: settings.directionTri,
+          })
+        : [...scenario.mains[i]],
+      plisGagnesTotal: 0,
+    }));
+
+    const atout = scenario.atoutInitial ?? null;
+
+    set({
+      ...ETAT_INITIAL,
+      varianteId: scenario.varianteId,
+      phase: variante.atoutChoisi ? 'encheres' : 'jeu',
+      joueurs,
+      manche: 1,
+      scores: [0, 0, 0, 0],
+      atout,
+      donneur,
+      tourDeJoueur: (donneur + 1) % 4,
+      etatEnchere: {
+        joueurCourantId: (donneur + 1) % 4,
+        meilleureEnchere: null,
+        passesConsecutifs: 0,
+        historique: [],
+      },
+      estScenario: true,
+    });
+
     if (variante.atoutChoisi && ((donneur + 1) % 4 !== 0 || settings.autoJeu)) {
       setTimeout(() => get()._faireProchaineActionIA(), 600);
     }
@@ -241,9 +293,9 @@ export const useGameStore = create<GameStore>((set, get) => ({
         const contrat = state.contratEnCours!;
         const resultat = (variante.calculScore ?? calculerScoreGenerique)(contrat, plisCpte);
         const scoreManche = construireScoreManche(state.manche, contrat, plisCpte, resultat);
-        const nouveauxScores = state.scores.map(
-          (s, i) => s + (resultat.deltaScores[i] ?? 0),
-        );
+        const nouveauxScores = state.estScenario
+          ? state.scores // Pas de changement pour les scénarios
+          : state.scores.map((s, i) => s + (resultat.deltaScores[i] ?? 0));
 
         set({
           phase: 'fin_manche',

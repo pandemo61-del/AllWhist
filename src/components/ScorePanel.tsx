@@ -54,7 +54,7 @@ export const MancheResultat: React.FC<MancheResultatProps> = ({
   const { contrat, reussite, details, plisParJoueur, deltaScores } = scoreManche;
   const [voirPlis, setVoirPlis] = React.useState(false);
   const [commentSel, setCommentSel] = React.useState<CommentaireExpert | null>(null);
-  const { plisTermines, atout } = useGameStore();
+  const { plisTermines, atout, estScenario } = useGameStore();
   const insets = useSafeAreaInsets();
 
   const classement = [...joueurs].sort(
@@ -209,7 +209,9 @@ export const MancheResultat: React.FC<MancheResultatProps> = ({
         <Text style={mancheStyles.details}>{details}</Text>
 
         <View style={mancheStyles.section}>
-          <Text style={mancheStyles.sectionLabel}>Cette manche</Text>
+          <Text style={mancheStyles.sectionLabel}>
+            {estScenario ? "Résultat pédagogique" : "Cette manche"}
+          </Text>
           {joueurs.map(j => {
             const delta = deltaScores[j.id] ?? 0;
             const plis = plisParJoueur[j.id] ?? 0;
@@ -221,27 +223,40 @@ export const MancheResultat: React.FC<MancheResultatProps> = ({
                   </Text>
                   <Text style={mancheStyles.joueurPlis}>{plis} pli{plis > 1 ? 's' : ''}</Text>
                 </View>
-                <Text style={[mancheStyles.delta, delta > 0 && mancheStyles.deltaPos, delta < 0 && mancheStyles.deltaNeg]}>
+                <Text style={[
+                  mancheStyles.delta,
+                  delta > 0 && mancheStyles.deltaPos,
+                  delta < 0 && mancheStyles.deltaNeg,
+                  estScenario && { opacity: 0.6 }
+                ]}>
                   {delta > 0 ? '+' : ''}{delta}
+                  {estScenario ? '*' : ''}
                 </Text>
               </View>
             );
           })}
+          {estScenario && (
+            <Text style={mancheStyles.noteEntrainement}>
+              * En mode entraînement, les points ne sont pas comptabilisés au score global.
+            </Text>
+          )}
         </View>
 
-        <View style={mancheStyles.section}>
-          <Text style={mancheStyles.sectionLabel}>Classement total</Text>
-          {classement.map((j, rang) => (
-            <View key={j.id} style={mancheStyles.classementRow}>
-              <Text style={mancheStyles.rang}>{rang + 1}</Text>
-              <View style={mancheStyles.rangBar}>
-                <View style={[mancheStyles.rangFill, { width: `${Math.max(5, (scoresTotal[j.id] / (Math.max(...scoresTotal, 1) || 1)) * 100)}%`, backgroundColor: j.id === 0 ? Colors.primary : Colors.bgSurface }]} />
+        {!estScenario && (
+          <View style={mancheStyles.section}>
+            <Text style={mancheStyles.sectionLabel}>Classement total</Text>
+            {classement.map((j, rang) => (
+              <View key={j.id} style={mancheStyles.classementRow}>
+                <Text style={mancheStyles.rang}>{rang + 1}</Text>
+                <View style={mancheStyles.rangBar}>
+                  <View style={[mancheStyles.rangFill, { width: `${Math.max(5, (scoresTotal[j.id] / (Math.max(...scoresTotal, 1) || 1)) * 100)}%`, backgroundColor: j.id === 0 ? Colors.primary : Colors.bgSurface }]} />
+                </View>
+                <Text style={mancheStyles.rangNom}>{j.id === 0 ? 'Vous' : j.nom}</Text>
+                <Text style={mancheStyles.rangScore}>{scoresTotal[j.id]}</Text>
               </View>
-              <Text style={mancheStyles.rangNom}>{j.id === 0 ? 'Vous' : j.nom}</Text>
-              <Text style={mancheStyles.rangScore}>{scoresTotal[j.id]}</Text>
-            </View>
-          ))}
-        </View>
+            ))}
+          </View>
+        )}
       </ScrollView>
 
       {/* Footer fixe pour les boutons - Toujours visible avec Safe Area Insets */}
@@ -282,6 +297,13 @@ const mancheStyles = StyleSheet.create({
   header3DTitre: { fontSize: FontSize.xl, fontWeight: FontWeight.black, color: '#fff', textShadowColor: 'rgba(0,0,0,0.3)', textShadowOffset: { width: 1, height: 1 }, textShadowRadius: 3 },
   header3DContrat: { fontSize: FontSize.sm, color: 'rgba(255,255,255,0.9)', fontWeight: FontWeight.bold },
   details: { fontSize: FontSize.xs, color: Colors.textSecondary, textAlign: 'center', marginBottom: Spacing.sm, fontStyle: 'italic' },
+  noteEntrainement: {
+    fontSize: 10,
+    color: Colors.textMuted,
+    fontStyle: 'italic',
+    marginTop: Spacing.sm,
+    textAlign: 'center',
+  },
   section: { marginBottom: Spacing.sm },
   sectionLabel: { fontSize: FontSize.xs, color: Colors.textMuted, textTransform: 'uppercase', letterSpacing: 0.8, fontWeight: FontWeight.semibold, marginBottom: Spacing.sm },
   joueurRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: Spacing.xs, borderBottomWidth: 0.5, borderBottomColor: Colors.border },

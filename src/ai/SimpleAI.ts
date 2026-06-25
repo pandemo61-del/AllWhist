@@ -238,9 +238,10 @@ export function choisirEnchere(
   // --- RÈGLES OBLIGATOIRES (Whist de Gand) ---
   if (variante.id === 'whist-gand') {
     const nbAs = main.filter(c => c.valeur === 14).length;
+    const currentPriorite = meilleureEnchere?.priorite ?? -1;
 
-    // Si on a 3 As -> Trou obligatoire
-    if (nbAs === 3) {
+    // Si on a 3 As -> Trou obligatoire (priorité 2)
+    if (nbAs === 3 && currentPriorite < 2) {
       const asPossedes = main.filter(c => c.valeur === 14).map(c => c.couleur);
       const asManquant = [Couleur.PIQUE, Couleur.COEUR, Couleur.CARREAU, Couleur.TREFLE]
         .find(col => !asPossedes.includes(col));
@@ -253,8 +254,8 @@ export function choisirEnchere(
       };
     }
 
-    // Si on a 4 As -> Trou Royal obligatoire
-    if (nbAs === 4) {
+    // Si on a 4 As -> Trou Royal obligatoire (priorité 3)
+    if (nbAs === 4 && currentPriorite < 3) {
       return {
         action: 'enchere',
         contratId: 'trou_royal',
@@ -282,7 +283,8 @@ export function choisirEnchere(
 
   // Évaluer misère : force très basse ET très peu de grosses cartes
   const nbGrossesCartes = main.filter(c => c.valeur >= 11).length; // Valet et +
-  const peutMisere = force <= seuils.misere && nbGrossesCartes <= 1 && !main.some(c => c.estJoker);
+  const estTresFaible = force <= (seuils.misere + 2) && nbGrossesCartes === 0;
+  const peutMisere = force <= (seuils.misere + 5) && nbGrossesCartes <= 1 && !main.some(c => c.estJoker);
 
   // Choisir le contrat selon la force (ordre de priorité logique)
   let contratChoisi: ContratConfig | null = null;
@@ -293,8 +295,13 @@ export function choisirEnchere(
     ) ?? null;
   } else if (force >= seuils.solo && nbAtouts >= 5) {
     contratChoisi = contratsDisponibles.find(c => c.id === 'solo') ?? null;
-  } else if (peutMisere && contratsDisponibles.some(c => c.id === 'misere')) {
-    contratChoisi = contratsDisponibles.find(c => c.id === 'misere') ?? null;
+  } else if (peutMisere) {
+    // Si la main est extrêmement faible, proposer la Misère Ouverte (plus payante)
+    if (estTresFaible && contratsDisponibles.some(c => c.id === 'misere_ouverte')) {
+      contratChoisi = contratsDisponibles.find(c => c.id === 'misere_ouverte') ?? null;
+    } else {
+      contratChoisi = contratsDisponibles.find(c => c.id === 'misere') ?? null;
+    }
   } else if (force >= seuils.demande) {
     contratChoisi = contratsDisponibles.find(c => c.id === 'demande') ?? null;
   }

@@ -53,10 +53,12 @@ export const BidPanel: React.FC<BidPanelProps> = ({
   const forceTrou = React.useMemo(() => {
     if (variante.id !== 'whist-gand') return null;
     const nbAs = main.filter(c => c.valeur === 14).length;
-    if (nbAs === 3) return 'trou';
-    if (nbAs === 4) return 'trou_royal';
+    const currentPriorite = meilleureEnchere?.priorite ?? -1;
+
+    if (nbAs === 3 && currentPriorite < 2) return 'trou';
+    if (nbAs === 4 && currentPriorite < 3) return 'trou_royal';
     return null;
-  }, [main, variante]);
+  }, [main, variante, meilleureEnchere]);
 
   // Contrats disponibles (priorité > enchère actuelle)
   const contratsDisponibles = variante.contrats.filter(c => {

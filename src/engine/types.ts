@@ -124,4 +124,5 @@ export interface EtatPartie {
   etatEnchere: EtatEnchere;
   historiqueManches: ScoreManche[];
   partenaireRévélé: boolean;    // pour Demande Gand
+  estScenario: boolean;         // true si c'est une partie d'entraînement
 }

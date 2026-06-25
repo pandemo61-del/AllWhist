@@ -12,19 +12,24 @@ import { getVariante } from '../../src/variants/index';
 import { SYMBOLE } from '../../src/engine/deck';
 import { Couleur } from '../../src/engine/types';
 import { useGameStore } from '../../src/store/gameStore';
+import { SCENARIOS, Scenario } from '../../src/data/scenarios';
 import { Colors, Spacing, FontSize, FontWeight, Radius } from '../../src/constants/theme';
 import { useTranslation } from '../../src/i18n';
 
-type Onglet = 'regles' | 'contrats' | 'conseils';
+type Onglet = 'regles' | 'contrats' | 'conseils' | 'scenarios';
 
 export default function LearnScreen() {
   const { t } = useTranslation();
   const { varianteId } = useLocalSearchParams<{ varianteId: string }>();
   const [onglet, setOnglet] = useState<Onglet>('regles');
-  const initialiserPartie = useGameStore(s => s.initialiserPartie);
+  const { initialiserPartie, chargerScenario } = useGameStore();
 
   const variante = React.useMemo(() => {
     try { return getVariante(varianteId ?? ''); } catch { return null; }
+  }, [varianteId]);
+
+  const scenariosFiltrés = React.useMemo(() => {
+    return SCENARIOS.filter(s => s.varianteId === varianteId);
   }, [varianteId]);
 
   if (!variante) {
@@ -51,7 +56,7 @@ export default function LearnScreen() {
 
       {/* Onglets */}
       <View style={styles.onglets}>
-        {(['regles', 'contrats', 'conseils'] as Onglet[]).map(o => (
+        {(['regles', 'contrats', 'conseils', 'scenarios'] as Onglet[]).map(o => (
           <TouchableOpacity
             key={o}
             style={[styles.onglet, onglet === o && styles.ongletActif]}
@@ -61,7 +66,8 @@ export default function LearnScreen() {
               {{
                 regles: t('learn.tabs.regles'),
                 contrats: t('learn.tabs.contrats'),
-                conseils: t('learn.tabs.conseils')
+                conseils: t('learn.tabs.conseils'),
+                scenarios: t('learn.tabs.scenarios') || 'Pratique'
               }[o]}
             </Text>
           </TouchableOpacity>
@@ -128,6 +134,31 @@ export default function LearnScreen() {
                   <Text style={styles.conseilDesc}>{conseil.desc}</Text>
                 </View>
               </View>
+            ))}
+          </View>
+        )}
+
+        {/* ── Onglet Scénarios ────────────────── */}
+        {onglet === 'scenarios' && (
+          <View style={styles.scenariosListe}>
+            <Text style={styles.sectionSousTitre}>
+              Parties prédéfinies pour s'entraîner aux annonces
+            </Text>
+            {scenariosFiltrés.map(scenario => (
+              <TouchableOpacity
+                key={scenario.id}
+                style={styles.scenarioCard}
+                onPress={() => {
+                  chargerScenario(scenario);
+                  router.replace(`/game/${scenario.varianteId}`);
+                }}
+              >
+                <View style={styles.scenarioHeader}>
+                  <Text style={styles.scenarioTitre}>{scenario.titre}</Text>
+                  <Text style={styles.scenarioGo}>Lancer →</Text>
+                </View>
+                <Text style={styles.scenarioDesc}>{scenario.description}</Text>
+              </TouchableOpacity>
             ))}
           </View>
         )}
@@ -369,6 +400,43 @@ const styles = StyleSheet.create({
   conseilDesc: {
     fontSize: FontSize.sm,
     color: Colors.textMuted,
+    lineHeight: 18,
+  },
+
+  // Scénarios
+  scenariosListe: { gap: Spacing.sm },
+  sectionSousTitre: {
+    fontSize: FontSize.xs,
+    color: Colors.textMuted,
+    marginBottom: Spacing.md,
+    fontStyle: 'italic',
+  },
+  scenarioCard: {
+    backgroundColor: Colors.bgCard,
+    borderRadius: Radius.lg,
+    padding: Spacing.md,
+    borderWidth: 0.5,
+    borderColor: Colors.border,
+  },
+  scenarioHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  scenarioTitre: {
+    fontSize: FontSize.md,
+    fontWeight: FontWeight.semibold,
+    color: Colors.primary,
+  },
+  scenarioGo: {
+    fontSize: FontSize.sm,
+    fontWeight: FontWeight.bold,
+    color: Colors.primary,
+  },
+  scenarioDesc: {
+    fontSize: FontSize.sm,
+    color: Colors.textSecondary,
     lineHeight: 18,
   },
 
