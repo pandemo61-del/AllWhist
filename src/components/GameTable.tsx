@@ -108,17 +108,17 @@ export const GameTable: React.FC<GameTableProps> = ({
       {/* ── Rangée du milieu ─────────────────────── */}
       <View style={styles.milieu}>
 
-        {/* Joueur Ouest (IA 3) */}
+        {/* Joueur Ouest (IA 1) */}
         <PlayerSlot
-          joueur={joueurs[3]}
+          joueur={joueurs[1]}
           position="ouest"
-          carteJouee={carteJoueeParJoueur(3)}
-          estSonTour={tourDeJoueur === 3}
-          plisManche={getPlisGagnes(3)}
-          estPartenaire={partenaireRévélé && contrat?.partenaireId === 3}
-          estAnnonceur={contrat?.joueurId === 3}
+          carteJouee={carteJoueeParJoueur(1)}
+          estSonTour={tourDeJoueur === 1}
+          plisManche={getPlisGagnes(1)}
+          estPartenaire={partenaireRévélé && contrat?.partenaireId === 1}
+          estAnnonceur={contrat?.joueurId === 1}
           gagnantIdPli={pliEnCours.gagnantId}
-          equipe={getEquipe(3)}
+          equipe={getEquipe(1)}
         />
 
         {/* Zone du pli central */}
@@ -128,17 +128,17 @@ export const GameTable: React.FC<GameTableProps> = ({
           contrat={contrat}
         />
 
-        {/* Joueur Est (IA 2) */}
+        {/* Joueur Est (IA 3) */}
         <PlayerSlot
-          joueur={joueurs[1]}
+          joueur={joueurs[3]}
           position="est"
-          carteJouee={carteJoueeParJoueur(1)}
-          estSonTour={tourDeJoueur === 1}
-          plisManche={getPlisGagnes(1)}
-          estPartenaire={partenaireRévélé && contrat?.partenaireId === 1}
-          estAnnonceur={contrat?.joueurId === 1}
+          carteJouee={carteJoueeParJoueur(3)}
+          estSonTour={tourDeJoueur === 3}
+          plisManche={getPlisGagnes(3)}
+          estPartenaire={partenaireRévélé && contrat?.partenaireId === 3}
+          estAnnonceur={contrat?.joueurId === 3}
           gagnantIdPli={pliEnCours.gagnantId}
-          equipe={getEquipe(1)}
+          equipe={getEquipe(3)}
         />
       </View>
 
@@ -211,7 +211,7 @@ const PlayerSlot: React.FC<PlayerSlotProps> = ({
   // Animation vers le vainqueur
   React.useEffect(() => {
     if (gagnantIdPli !== undefined && carteJouee) {
-      const posMap: Record<number, string> = { 0: 'sud', 1: 'est', 2: 'nord', 3: 'ouest' };
+      const posMap: Record<number, string> = { 0: 'sud', 1: 'ouest', 2: 'nord', 3: 'est' };
       const vPos = posMap[gagnantIdPli]; // position du vainqueur
 
       // Coordonnées virtuelles pour calculer le vecteur de direction

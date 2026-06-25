@@ -104,6 +104,66 @@ export const translations: Record<Langue, any> = {
           classique: { nom: 'Partie classique', description: 'Faire le maximum de plis avec son partenaire.' }
         }
       },
+      'solo-whist': {
+        nom: 'Solo Whist',
+        description: 'La version britannique moderne. Un contre trois, avec une hiérarchie d\'enchères.',
+        regles: [
+          'Chaque joueur reçoit 13 cartes.',
+          'Le contrat le plus élevé remporte les enchères.',
+          'Proposal & Acceptance : deux joueurs s\'associent pour faire 8 plis.',
+          'Solo : un joueur seul fait 5 plis avec l\'atout de son choix.',
+          'Misère : un joueur seul ne fait aucun pli, sans atout.',
+          'Abondance : un joueur seul fait 9 plis avec son atout.',
+        ],
+        contrats: {
+          passe: { nom: 'Passe', description: 'Je passe.' },
+          proposal: { nom: 'Proposal', description: 'Cherche un partenaire pour faire 8 plis.' },
+          solo: { nom: 'Solo', description: 'Faire 5 plis seul.' },
+          misere: { nom: 'Misère', description: 'Zéro pli, sans atout.' },
+          abondance: { nom: 'Abondance', description: 'Faire 9 plis seul.' },
+          misere_ouverte: { nom: 'Misère ouverte', description: 'Zéro pli, cartes abattues.' },
+          abondance_declaree: { nom: 'Abondance déclarée', description: 'Faire 13 plis.' },
+        }
+      },
+      'boston-whist': {
+        nom: 'Boston Whist',
+        description: 'La variante aristocratique du XVIIIe siècle. Jeu individuel avec enchères élaborées.',
+        regles: [
+          'Chaque joueur joue pour lui-même.',
+          'Hiérarchie des contrats : Boston, Piccolo, Misère, Chelem.',
+          'Boston : faire exactement 5 plis.',
+          'Piccolo : faire exactement 1 pli.',
+          'Chaque contrat peut être surenchéri.',
+        ],
+        contrats: {
+          passe: { nom: 'Passe', description: 'Je passe.' },
+          boston: { nom: 'Boston', description: 'Faire exactement 5 plis.' },
+          piccolo: { nom: 'Piccolo', description: 'Faire exactement 1 pli.' },
+          misere: { nom: 'Misère', description: 'Zéro pli, sans atout.' },
+          boston_sur: { nom: 'Boston sur', description: '6 plis minimum.' },
+          misere_ouverte: { nom: 'Misère ouverte', description: 'Zéro pli, cartes abattues.' },
+          chelem: { nom: 'Chelem', description: 'Faire les 13 plis.' },
+        }
+      },
+      'bid-whist': {
+        nom: 'Bid Whist',
+        description: 'La version américaine avec Joker et Kitty.',
+        regles: [
+          'Deux équipes fixes (0/2 contre 1/3).',
+          'Un Joker est inclus (carte la plus forte).',
+          'Les enchères indiquent le nombre de plis à faire (min 3).',
+          'Le gagnant récupère le Kitty (6 cartes).',
+          'Mode Descendant : le 2 bat l\'As.',
+        ],
+        contrats: {
+          passe: { nom: 'Passe', description: 'Je passe.' },
+          bid_3_montant: { nom: '3 Montant', description: '9 plis en ordre normal.' },
+          bid_3_descendant: { nom: '3 Descendant', description: '9 plis en ordre inversé.' },
+          bid_3_sans: { nom: '3 Sans-atout', description: '9 plis sans atout.' },
+          bid_6_sans: { nom: '6 Sans-atout', description: '12 plis sans atout.' },
+          bid_7_sans: { nom: '7 Sans-atout', description: '13 plis sans atout.' },
+        }
+      }
     },
     learn: {
       tabs: { regles: 'Règles', contrats: 'Contrats', conseils: 'Conseils' },
@@ -181,21 +241,8 @@ export const translations: Record<Langue, any> = {
       [Couleur.PIQUE]: 'spade',
     },
     variants: {
-      difficulty: {
-        debutant: 'Beginner',
-        intermediaire: 'Intermediate',
-        expert: 'Expert',
-      },
-      tags: {
-        players: 'players',
-        bidding: 'Bidding',
-        randomTrump: 'Random Trump',
-        fixedTeams: 'Fixed Teams',
-        secretPartner: 'Secret Partner',
-        individual: 'Individual',
-        joker: 'Joker',
-        kitty: 'Kitty',
-      },
+      difficulty: { debutant: 'Beginner', intermediaire: 'Intermediate', expert: 'Expert' },
+      tags: { players: 'players', bidding: 'Bidding', randomTrump: 'Random Trump', fixedTeams: 'Fixed Teams', secretPartner: 'Secret Partner', individual: 'Individual', joker: 'Joker', kitty: 'Kitty' },
       rulesLabel: 'Essential Rules',
       contractsLabel: 'Contracts',
       'whist-gand': {
@@ -218,6 +265,47 @@ export const translations: Record<Langue, any> = {
         regles: ['Two fixed teams.', '13 cards each. 52nd is trump.', 'Left of dealer leads.', 'Follow suit if possible.', 'Highest card or trump wins.', 'Tricks over 6 earn 1 point.'],
         contrats: { classique: { nom: 'Classic Game', description: 'Max tricks with partner.' } }
       },
+      'solo-whist': {
+        nom: 'Solo Whist',
+        description: 'Modern British version.',
+        regles: ['13 cards each.', 'Highest contract wins bidding.', 'Proposal & Acceptance: 2 players for 8 tricks.', 'Solo: 5 tricks alone.', 'Misery: zero tricks, no trump.', 'Abundance: 9 tricks alone.'],
+        contrats: {
+          passe: { nom: 'Pass', description: 'I pass.' },
+          proposal: { nom: 'Proposal', description: 'Seek partner for 8 tricks.' },
+          solo: { nom: 'Solo', description: 'Make 5 tricks alone.' },
+          misere: { nom: 'Misery', description: 'Zero tricks, no trump.' },
+          abondance: { nom: 'Abundance', description: 'Make 9 tricks alone.' },
+          misere_ouverte: { nom: 'Open Misery', description: 'Zero tricks, cards shown.' },
+          abondance_declaree: { nom: 'Declared Abundance', description: 'Make 13 tricks.' },
+        }
+      },
+      'boston-whist': {
+        nom: 'Boston Whist',
+        description: '18th-century aristocratic variant.',
+        regles: ['Individual play.', 'Contract hierarchy: Boston, Piccolo, Misery, Slam.', 'Boston: exactly 5 tricks.', 'Piccolo: exactly 1 trick.', 'Contracts can be overbid.'],
+        contrats: {
+          passe: { nom: 'Pass', description: 'I pass.' },
+          boston: { nom: 'Boston', description: 'Exactly 5 tricks.' },
+          piccolo: { nom: 'Piccolo', description: 'Exactly 1 trick.' },
+          misere: { nom: 'Misery', description: 'Zero tricks, no trump.' },
+          boston_sur: { nom: 'Boston over', description: 'Min 6 tricks.' },
+          misere_ouverte: { nom: 'Open Misery', description: 'Zero tricks, cards shown.' },
+          chelem: { nom: 'Slam', description: 'Make all 13 tricks.' },
+        }
+      },
+      'bid-whist': {
+        nom: 'Bid Whist',
+        description: 'American version with Joker and Kitty.',
+        regles: ['Two fixed teams.', 'Joker is highest card.', 'Bidding sets trick target (min 3).', 'Winner takes Kitty (6 cards).', 'Down mode: 2 beats Ace.'],
+        contrats: {
+          passe: { nom: 'Pass', description: 'I pass.' },
+          bid_3_montant: { nom: '3 Up', description: '9 tricks normal order.' },
+          bid_3_descendant: { nom: '3 Down', description: '9 tricks reverse order.' },
+          bid_3_sans: { nom: '3 No-trump', description: '9 tricks no trump.' },
+          bid_6_sans: { nom: '6 No-trump', description: '12 tricks no trump.' },
+          bid_7_sans: { nom: '7 No-trump', description: '13 tricks no trump.' },
+        }
+      }
     },
     learn: {
       tabs: { regles: 'Rules', contrats: 'Contracts', conseils: 'Tips' },
@@ -297,10 +385,10 @@ export const translations: Record<Langue, any> = {
       'whist-gand': {
         nom: 'Gentse Whist',
         description: 'De Belgische variant bij uitstek.',
-        regles: ['Regels van Gentse Whist...'],
+        regles: ['13 kaarten per speler.', 'Bieden met de klok mee.', 'Deler verplicht bij pas.', 'Kies Aas voor partner.', 'Onthulling bij spelen Aas.', 'Solo is 1 tegen 3.', 'Miserie: nul slagen, geen troef.', 'Open Miserie: kaarten zichtbaar.', 'Abondance: kies troef vooraf.'],
         contrats: {
           passe: { nom: 'Pas', description: 'Ik speel niet.' },
-          demande: { nom: 'Vraag', description: '8 slagen met geheime partner.' },
+          demande: { nom: 'Vraag', description: '8 slagen met partner.' },
           solo: { nom: 'Solo', description: '5 slagen alleen.' },
           abondance: { nom: 'Abondance', description: '9 slagen alleen.' },
           misere: { nom: 'Miserie', description: 'Nul slagen, geen troef.' },
@@ -311,9 +399,50 @@ export const translations: Record<Langue, any> = {
       'whist-classique': {
         nom: 'Klassiek Whist',
         description: 'De originele vorm van Whist.',
-        regles: ['Twee vaste teams.', '13 kaarten elk. 52ste is troef.', 'Links van deler begint.', 'Volg kleur indien mogelijk.', 'Hoogste kaart of troef wint.', 'Slagen boven 6 geven 1 punt.'],
+        regles: ['Twee vaste teams.', '13 kaarten elk. 52ste is troef.', 'Links van deler begint.', 'Kleur volgen indien mogelijk.', 'Hoogste kaart of troef wint.', 'Slagen boven 6 geven 1 punt.'],
         contrats: { classique: { nom: 'Klassiek Spel', description: 'Maximaal slagen met partner.' } }
       },
+      'solo-whist': {
+        nom: 'Solo Whist',
+        description: 'Britse Solo versie.',
+        regles: ['13 kaarten elk.', 'Hoogste bod wint.', 'Proposal: partner voor 8 slagen.', 'Solo: 5 slagen alleen.', 'Miserie: nul slagen.', 'Abondance: 9 slagen alleen.'],
+        contrats: {
+          passe: { nom: 'Pas', description: 'Ik pas.' },
+          proposal: { nom: 'Proposal', description: 'Zoek partner voor 8 slagen.' },
+          solo: { nom: 'Solo', description: '5 slagen alleen.' },
+          misere: { nom: 'Miserie', description: 'Nul slagen.' },
+          abondance: { nom: 'Abondance', description: '9 slagen alleen.' },
+          misere_ouverte: { nom: 'Open Miserie', description: 'Nul slagen, kaarten open.' },
+          abondance_declaree: { nom: 'Aangekondigde Abondance', description: '13 slagen.' },
+        }
+      },
+      'boston-whist': {
+        nom: 'Boston Whist',
+        description: 'Aristocratische versie.',
+        regles: ['Individueel spel.', 'Hierarchie: Boston, Piccolo, Miserie.', 'Boston: precies 5 slagen.', 'Piccolo: precies 1 slag.', 'Overbieden mogelijk.'],
+        contrats: {
+          passe: { nom: 'Pas', description: 'Ik pas.' },
+          boston: { nom: 'Boston', description: 'Precies 5 slagen.' },
+          piccolo: { nom: 'Piccolo', description: 'Precies 1 slag.' },
+          misere: { nom: 'Miserie', description: 'Nul slagen.' },
+          boston_sur: { nom: 'Boston sur', description: 'Min 6 slagen.' },
+          misere_ouverte: { nom: 'Open Miserie', description: 'Nul slagen, kaarten open.' },
+          chelem: { nom: 'Slem', description: 'Alle 13 slagen.' },
+        }
+      },
+      'bid-whist': {
+        nom: 'Bid Whist',
+        description: 'Amerikaanse Joker versie.',
+        regles: ['Vaste teams.', 'Joker is hoogst.', 'Bieden voor aantal slagen.', 'Winnaar neemt Pot (6).', 'Down: 2 is hoogste.'],
+        contrats: {
+          passe: { nom: 'Pas', description: 'Ik pas.' },
+          bid_3_montant: { nom: '3 Omhoog', description: '9 slagen normaal.' },
+          bid_3_descendant: { nom: '3 Omlaag', description: '9 slagen omgekeerd.' },
+          bid_3_sans: { nom: '3 Zonder', description: '9 slagen no-trump.' },
+          bid_6_sans: { nom: '6 Zonder', description: '12 slagen no-trump.' },
+          bid_7_sans: { nom: '7 Zonder', description: '13 slagen no-trump.' },
+        }
+      }
     },
     learn: {
       tabs: { regles: 'Regels', contrats: 'Contracten', conseils: 'Tips' },
@@ -382,24 +511,65 @@ export const translations: Record<Langue, any> = {
       contractsLabel: 'Kontrakte',
       'whist-gand': {
         nom: 'Genter Whist',
-        description: 'Die belgische Variante.',
-        regles: ['Regeln...'],
+        description: 'Belgische Variante.',
+        regles: ['13 Karten pro Spieler.', 'Reizen im Uhrzeigersinn.', 'Geber muss fordern wenn alle passen.', 'Ass für Partner wählen.', 'Partner durch Ass offenbart.', 'Solo: 1 gegen 3.', 'Misere: 0 Stiche.', 'Offene Misere: Karten sichtbar.'],
         contrats: {
           passe: { nom: 'Pass', description: 'Ich spiele nicht.' },
           demande: { nom: 'Forderung', description: '8 Stiche mit Partner.' },
           solo: { nom: 'Solo', description: '5 Stiche allein.' },
           abondance: { nom: 'Abondance', description: '9 Stiche allein.' },
-          misere: { nom: 'Misere', description: 'Null Stiche, kein Trumpf.' },
+          misere: { nom: 'Misere', description: 'Null Stiche.' },
           abondance_declaree: { nom: 'Angekündigte Abondance', description: '13 Stiche.' },
           misere_ouverte: { nom: 'Offene Misere', description: 'Null Stiche, Karten offen.' },
         }
       },
       'whist-classique': {
         nom: 'Klassisches Whist',
-        description: 'Die ursprüngliche Form des Whist.',
-        regles: ['Zwei feste Teams.', '13 Karten jeder. 52. ist Trumpf.', 'Links vom Geber beginnt.', 'Farbe bedienen falls möglich.', 'Höchste Karte oder Trumpf gewinnt.', 'Stiche über 6 geben 1 Punkt.'],
+        description: 'Ursprüngliches Whist.',
+        regles: ['Feste Teams.', '13 Karten. 52. ist Trumpf.', 'Links von Geber beginnt.', 'Farbe bedienen.', 'Höchste Karte gewinnt.', 'Stiche über 6: 1 Punkt.'],
         contrats: { classique: { nom: 'Klassische Partie', description: 'Max Stiche mit Partner.' } }
       },
+      'solo-whist': {
+        nom: 'Solo Whist',
+        description: 'Britische Solo-Version.',
+        regles: ['13 Karten.', 'Höchstgebot gewinnt.', 'Proposal: Partner für 8 Stiche.', 'Solo: 5 Stiche allein.', 'Misere: 0 Stiche.', 'Abondance: 9 Stiche allein.'],
+        contrats: {
+          passe: { nom: 'Pass', description: 'Ich passe.' },
+          proposal: { nom: 'Proposal', description: 'Partner für 8 Stiche.' },
+          solo: { nom: 'Solo', description: '5 Stiche allein.' },
+          misere: { nom: 'Misere', description: 'Null Stiche.' },
+          abondance: { nom: 'Abondance', description: '9 Stiche allein.' },
+          misere_ouverte: { nom: 'Offene Misere', description: 'Null Stiche, Karten offen.' },
+          abondance_declaree: { nom: 'Angekündigte Abondance', description: '13 Stiche.' },
+        }
+      },
+      'boston-whist': {
+        nom: 'Boston Whist',
+        description: 'Aristokratische Variante.',
+        regles: ['Einzelspiel.', 'Boston: 5 Stiche.', 'Piccolo: 1 Stich.', 'Überbieten möglich.'],
+        contrats: {
+          passe: { nom: 'Pass', description: 'Ich passe.' },
+          boston: { nom: 'Boston', description: 'Genau 5 Stiche.' },
+          piccolo: { nom: 'Piccolo', description: 'Genau 1 Stich.' },
+          misere: { nom: 'Misere', description: 'Null Stiche.' },
+          boston_sur: { nom: 'Boston sur', description: 'Min 6 Stiche.' },
+          misere_ouverte: { nom: 'Offene Misere', description: 'Null Stiche, Karten offen.' },
+          chelem: { nom: 'Schlem', description: 'Alle 13 Stiche.' },
+        }
+      },
+      'bid-whist': {
+        nom: 'Bid Whist',
+        description: 'Amerikanische Version.',
+        regles: ['Feste Teams.', 'Joker ist am stärksten.', 'Bieten für Stichzahl.', 'Skat (6 Karten) für Sieger.', 'Down: 2 schlägt Ass.'],
+        contrats: {
+          passe: { nom: 'Pass', description: 'Ich passe.' },
+          bid_3_montant: { nom: '3 Aufwärts', description: '9 Stiche normal.' },
+          bid_3_descendant: { nom: '3 Abwärts', description: '9 Stiche umgekehrt.' },
+          bid_3_sans: { nom: '3 Ohne', description: '9 Stiche ohne Trumpf.' },
+          bid_6_sans: { nom: '6 Ohne', description: '12 Stiche ohne Trumpf.' },
+          bid_7_sans: { nom: '7 Ohne', description: '13 Stiche ohne Trumpf.' },
+        }
+      }
     },
     learn: {
       tabs: { regles: 'Regeln', contrats: 'Kontrakte', conseils: 'Tipps' },
@@ -468,24 +638,65 @@ export const translations: Record<Langue, any> = {
       contractsLabel: 'Contratos',
       'whist-gand': {
         nom: 'Whist de Gante',
-        description: 'La variante belga.',
-        regles: ['Reglas...'],
+        description: 'Variante belga.',
+        regles: ['13 cartas por jugador.', 'Pujas horario.', 'Repartidor obligado si pasan.', 'Elige As para compañero.', 'As revela compañero.', 'Solo es 1 contra 3.', 'Miseria: 0 bazas.', 'Miseria abierta: cartas visibles.'],
         contrats: {
           passe: { nom: 'Paso', description: 'No juego.' },
           demande: { nom: 'Demanda', description: '8 bazas con compañero.' },
           solo: { nom: 'Solo', description: '5 bazas solo.' },
           abondance: { nom: 'Abundancia', description: '9 bazas solo.' },
-          misere: { nom: 'Miseria', description: 'Cero bazas, sin triunfo.' },
+          misere: { nom: 'Miseria', description: 'Cero bazas.' },
           abondance_declaree: { nom: 'Abundancia declarada', description: '13 bazas.' },
-          misere_ouverte: { nom: 'Miseria abierta', description: 'Cero bazas, cartas visibles.' },
+          misere_ouverte: { nom: 'Miseria abierta', description: 'Cero bazas, visibles.' },
         }
       },
       'whist-classique': {
         nom: 'Whist Clásico',
-        description: 'La forma original de Whist.',
-        regles: ['Dos equipos fijos.', '13 cartas cada uno. 52 es triunfo.', 'Izquierda del repartidor empieza.', 'Seguir palo si es posible.', 'Carta más alta o triunfo gana.', 'Bazas sobre 6 ganan 1 punto.'],
+        description: 'Whist original.',
+        regles: ['Equipos fijos.', '13 cartas. 52 es triunfo.', 'Izquierda reparte.', 'Sigue palo.', 'Mayor gana.', 'Bazas > 6: 1 punto.'],
         contrats: { classique: { nom: 'Partida Clásica', description: 'Máximas bazas con compañero.' } }
       },
+      'solo-whist': {
+        nom: 'Solo Whist',
+        description: 'Versión británica.',
+        regles: ['13 cartas.', 'Mayor puja gana.', 'Proposal: 8 bazas par.', 'Solo: 5 bazas solo.', 'Miseria: 0 bazas.', 'Abundancia: 9 bazas solo.'],
+        contrats: {
+          passe: { nom: 'Paso', description: 'Paso.' },
+          proposal: { nom: 'Proposal', description: 'Compañero para 8 bazas.' },
+          solo: { nom: 'Solo', description: '5 bazas solo.' },
+          misere: { nom: 'Miseria', description: 'Cero bazas.' },
+          abondance: { nom: 'Abundancia', description: '9 bazas solo.' },
+          misere_ouverte: { nom: 'Miseria abierta', description: 'Cero bazas, visibles.' },
+          abondance_declaree: { nom: 'Abundancia declarada', description: '13 bazas.' },
+        }
+      },
+      'boston-whist': {
+        nom: 'Boston Whist',
+        description: 'Variante aristocrática.',
+        regles: ['Juego individual.', 'Boston: 5 bazas.', 'Piccolo: 1 baza.', 'Sujeto a puja.'],
+        contrats: {
+          passe: { nom: 'Paso', description: 'Paso.' },
+          boston: { nom: 'Boston', description: 'Exacto 5 bazas.' },
+          piccolo: { nom: 'Piccolo', description: 'Exacto 1 baza.' },
+          misere: { nom: 'Miseria', description: 'Cero bazas.' },
+          boston_sur: { nom: 'Boston sur', description: 'Min 6 bazas.' },
+          misere_ouverte: { nom: 'Miseria abierta', description: 'Cero bazas, visibles.' },
+          chelem: { nom: 'Eslam', description: 'Todas las 13 bazas.' },
+        }
+      },
+      'bid-whist': {
+        nom: 'Bid Whist',
+        description: 'Versión americana.',
+        regles: ['Equipos fijos.', 'Joker manda.', 'Pujar por bazas.', 'Ganador toma Kitty.', 'Down: 2 gana a As.'],
+        contrats: {
+          passe: { nom: 'Paso', description: 'Paso.' },
+          bid_3_montant: { nom: '3 Ascendente', description: '9 bazas.' },
+          bid_3_descendant: { nom: '3 Descendente', description: '9 bazas.' },
+          bid_3_sans: { nom: '3 Sin triunfo', description: '9 bazas.' },
+          bid_6_sans: { nom: '6 Sin triunfo', description: '12 bazas.' },
+          bid_7_sans: { nom: '7 Sin triunfo', description: '13 bazas.' },
+        }
+      }
     },
     learn: {
       tabs: { regles: 'Reglas', contrats: 'Contratos', conseils: 'Consejos' },
@@ -518,7 +729,7 @@ export const translations: Record<Langue, any> = {
       learnSub: 'Regras · Tutoriais · Contratos',
       stats: 'Estatísticas',
       statsSub: 'Histórico · Taxa de sucesso',
-      settingsSub: 'Dificuldade IA · Temas · Som',
+      settingsSub: 'Dificuldade IA · Tema · Som',
       variantsCount: 'variantes',
     },
     variantes: {
@@ -554,24 +765,65 @@ export const translations: Record<Langue, any> = {
       contractsLabel: 'Contratos',
       'whist-gand': {
         nom: 'Whist de Gante',
-        description: 'A variante belga.',
-        regles: ['Regras...'],
+        description: 'Variante belga.',
+        regles: ['13 cartas por jogador.', 'Lances horário.', 'Dador obrigado se todos passam.', 'Escolhe Ás para parceiro.', 'As revela parceiro.', 'Solo: 1 contra 3.', 'Miséria: 0 vazas.', 'Miséria aberta: visíveis.'],
         contrats: {
           passe: { nom: 'Passo', description: 'Não jogo.' },
           demande: { nom: 'Demanda', description: '8 vazas com parceiro.' },
           solo: { nom: 'Solo', description: '5 vazas sozinho.' },
           abondance: { nom: 'Abundância', description: '9 vazas sozinho.' },
-          misere: { nom: 'Miséria', description: 'Zero vazas, sem trunfo.' },
+          misere: { nom: 'Miséria', description: 'Zero vazas.' },
           abondance_declaree: { nom: 'Abundância declarada', description: '13 vazas.' },
-          misere_ouverte: { nom: 'Miséria aberta', description: 'Zero vazas, cartas visíveis.' },
+          misere_ouverte: { nom: 'Miséria aberta', description: 'Zero vazas, visíveis.' },
         }
       },
       'whist-classique': {
         nom: 'Whist Clássico',
-        description: 'A forma original do Whist.',
-        regles: ['Duas equipes fixas.', '13 cartas cada. 52 é trunfo.', 'Esquerda do dador começa.', 'Seguir naipe se possível.', 'Carta mais alta ou trunfo ganha.', 'Vazas acima de 6 valem 1 ponto.'],
+        description: 'Whist original.',
+        regles: ['Equipes fixas.', '13 cartas. 52 é trunfo.', 'Esquerda começa.', 'Segue naipe.', 'Maior ganha.', 'Vazas > 6: 1 ponto.'],
         contrats: { classique: { nom: 'Partida Clássica', description: 'Máximo de vazas com parceiro.' } }
       },
+      'solo-whist': {
+        nom: 'Solo Whist',
+        description: 'Versão britânica.',
+        regles: ['13 cartas.', 'Maior lance ganha.', 'Proposal: 8 vazas par.', 'Solo: 5 vazas sozinho.', 'Miséria: 0 vazas.', 'Abondance: 9 vazas sozinho.'],
+        contrats: {
+          passe: { nom: 'Passo', description: 'Passo.' },
+          proposal: { nom: 'Proposal', description: 'Parceiro para 8 vazas.' },
+          solo: { nom: 'Solo', description: '5 vazas sozinho.' },
+          misere: { nom: 'Miséria', description: 'Zero vazas.' },
+          abondance: { nom: 'Abundância', description: '9 vazas sozinho.' },
+          misere_ouverte: { nom: 'Miséria aberta', description: 'Zero vazas, visíveis.' },
+          abondance_declaree: { nom: 'Abundância declarada', description: '13 vazas.' },
+        }
+      },
+      'boston-whist': {
+        nom: 'Boston Whist',
+        description: 'Variante aristocrática.',
+        regles: ['Jogo individual.', 'Boston: 5 vazas.', 'Piccolo: 1 vaza.', 'Sujeito a lance.'],
+        contrats: {
+          passe: { nom: 'Passo', description: 'Passo.' },
+          boston: { nom: 'Boston', description: 'Exato 5 vazas.' },
+          piccolo: { nom: 'Piccolo', description: 'Exato 1 vaza.' },
+          misere: { nom: 'Miséria', description: 'Zero vazas.' },
+          boston_sur: { nom: 'Boston sur', description: 'Min 6 vazas.' },
+          misere_ouverte: { nom: 'Miséria aberta', description: 'Zero vazas, visíveis.' },
+          chelem: { nom: 'Slam', description: 'Todas as 13 vazas.' },
+        }
+      },
+      'bid-whist': {
+        nom: 'Bid Whist',
+        description: 'Versão americana.',
+        regles: ['Equipes fixas.', 'Joker é maior.', 'Lances por vazas.', 'Vencedor toma Kitty.', 'Down: 2 ganha de Ás.'],
+        contrats: {
+          passe: { nom: 'Passo', description: 'Passo.' },
+          bid_3_montant: { nom: '3 Ascendente', description: '9 vazas.' },
+          bid_3_descendant: { nom: '3 Descendente', description: '9 vazas.' },
+          bid_3_sans: { nom: '3 Sem trunfo', description: '9 vazas.' },
+          bid_6_sans: { nom: '6 Sem trunfo', description: '12 vazas.' },
+          bid_7_sans: { nom: '7 Sem trunfo', description: '13 vazas.' },
+        }
+      }
     },
     learn: {
       tabs: { regles: 'Regras', contrats: 'Contratos', conseils: 'Dicas' },

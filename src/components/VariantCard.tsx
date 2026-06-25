@@ -135,23 +135,31 @@ export const VariantCard: React.FC<VariantCardProps> = ({
         <View style={styles.regles}>
           <View style={styles.reglesDivider} />
           <Text style={styles.reglesLabel}>{t('variants.rulesLabel')}</Text>
-          {(t(`variants.${variante.id}.regles`) as string[]).map((regle, i) => (
-            <View key={i} style={styles.regleRow}>
-              <View style={[styles.regleNum, selectionne && styles.regleNumSel]}>
-                <Text style={[styles.regleNumTexte, selectionne && styles.regleNumTexteSel]}>
-                  {i + 1}
-                </Text>
-              </View>
-              <Text style={styles.regleTexte}>{regle}</Text>
-            </View>
-          ))}
+          {(() => {
+            const rules = t(`variants.${variante.id}.regles`);
+            if (Array.isArray(rules)) {
+              return rules.map((regle, i) => (
+                <View key={i} style={styles.regleRow}>
+                  <View style={[styles.regleNum, selectionne && styles.regleNumSel]}>
+                    <Text style={[styles.regleNumTexte, selectionne && styles.regleNumTexteSel]}>
+                      {i + 1}
+                    </Text>
+                  </View>
+                  <Text style={styles.regleTexte}>{regle}</Text>
+                </View>
+              ));
+            }
+            return <Text style={styles.regleTexte}>{String(rules)}</Text>;
+          })()}
 
           {/* Contrats disponibles */}
           <Text style={[styles.reglesLabel, { marginTop: Spacing.md }]}>{t('variants.contractsLabel')}</Text>
           <View style={styles.contratsGrid}>
             {variante.contrats.filter(c => c.id !== 'passe').map(c => (
               <View key={c.id} style={styles.contratPill}>
-                <Text style={styles.contratPillTexte}>{t(`variants.${variante.id}.contrats.${c.id}.nom`)}</Text>
+                <Text style={styles.contratPillTexte}>
+                  {t(`variants.${variante.id}.contrats.${c.id}.nom`) || c.nom}
+                </Text>
                 <Text style={styles.contratPillPts}>+{c.pointsReussite}</Text>
               </View>
             ))}

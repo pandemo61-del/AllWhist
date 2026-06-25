@@ -4,28 +4,39 @@ import { translations } from './translations';
 export const useTranslation = () => {
   const langue = useSettingsStore(state => state.langue);
 
-  const t = (key: string) => {
+  const t = (key: string): any => {
     const keys = key.split('.');
-    let result = translations[langue];
 
+    // 1. Essayer la langue actuelle
+    let current: any = translations[langue];
+    let found = true;
     for (const k of keys) {
-      if (result && result[k]) {
-        result = result[k];
+      if (current && current[k] !== undefined) {
+        current = current[k];
       } else {
-        // Fallback to FR if key not found in current language
-        let fallback = translations['fr'];
-        for (const fk of keys) {
-            if (fallback && fallback[fk]) {
-                fallback = fallback[fk];
-            } else {
-                return key;
-            }
-        }
-        return fallback;
+        found = false;
+        break;
       }
     }
+    if (found) return current;
 
-    return result;
+    // 2. Fallback sur le Français
+    if (langue !== 'fr') {
+      let fallback: any = translations['fr'];
+      let fallbackFound = true;
+      for (const k of keys) {
+        if (fallback && fallback[k] !== undefined) {
+          fallback = fallback[k];
+        } else {
+          fallbackFound = false;
+          break;
+        }
+      }
+      if (fallbackFound) return fallback;
+    }
+
+    // 3. Retourner la clé si rien n'est trouvé
+    return key;
   };
 
   return { t, langue };
