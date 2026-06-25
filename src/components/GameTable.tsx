@@ -184,6 +184,7 @@ const AnimatedPlayedCard: React.FC<AnimatedPlayedCardProps> = ({
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const scaleAnim = useRef(new Animated.Value(0.5)).current;
   const moveAnim = useRef(new Animated.ValueXY({ x: 0, y: 0 })).current;
+  const flipAnim = useRef(new Animated.Value(0)).current;
 
   // Déterminer la position cible sur la table pour ce joueur
   const POS_MAP: Record<number, { x: number, y: number }> = {
@@ -214,27 +215,43 @@ const AnimatedPlayedCard: React.FC<AnimatedPlayedCardProps> = ({
 
       Animated.sequence([
         Animated.delay(1000), // Laisser le temps de voir le pli complet
-        // Déplacement groupé vers le gagnant (côté face)
+        // 1. Déplacement groupé vers le gagnant (côté face)
         Animated.parallel([
           Animated.timing(moveAnim, {
             toValue: { x: winnerPos.x, y: winnerPos.y },
             duration: 700,
             useNativeDriver: true,
           }),
-          Animated.timing(fadeAnim, {
-            toValue: 0,
-            duration: 700,
-            useNativeDriver: true,
-          }),
           Animated.timing(scaleAnim, {
-            toValue: 0.6,
+            toValue: 0.8,
             duration: 700,
             useNativeDriver: true,
           }),
-        ])
+        ]),
+        // 2. Retournement final (montre le dos)
+        Animated.timing(flipAnim, {
+          toValue: 1,
+          duration: 400,
+          useNativeDriver: true,
+        }),
+        // 3. Disparition
+        Animated.timing(fadeAnim, {
+          toValue: 0,
+          duration: 300,
+          useNativeDriver: true,
+        })
       ]).start();
     }
   }, [isTrickFinished, gagnantId]);
+
+  const frontRotation = flipAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['0deg', '180deg'],
+  });
+  const backRotation = flipAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['180deg', '360deg'],
+  });
 
   return (
     <Animated.View style={[
@@ -249,7 +266,15 @@ const AnimatedPlayedCard: React.FC<AnimatedPlayedCardProps> = ({
         ]
       }
     ]}>
-      <CardFace carte={carte} taille="table" />
+      {/* Recto */}
+      <Animated.View style={{ backfaceVisibility: 'hidden', transform: [{ rotateY: frontRotation }] }}>
+        <CardFace carte={carte} taille="table" />
+      </Animated.View>
+
+      {/* Verso (apparaît à la fin du trajet) */}
+      <Animated.View style={[StyleSheet.absoluteFill, { backfaceVisibility: 'hidden', transform: [{ rotateY: backRotation }] }]}>
+        <CardBack style={{ width: CardSize.table.width, height: CardSize.table.height }} />
+      </Animated.View>
     </Animated.View>
   );
 };
