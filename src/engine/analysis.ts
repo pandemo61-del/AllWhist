@@ -27,7 +27,7 @@ export function analyserPli(
 
   if (cartesJouees.length < 4) return [];
 
-  // 1. Identifier les partenaires (simplifié : Sud(0)/Nord(2) et Est(1)/Ouest(3))
+  // 1. Identifier les partenaires
   const sontPartenaires = (id1: number, id2: number) => {
     // Cas spécifique pour le partenaire révélé dans le contrat
     if (contrat.partenaireId !== undefined) {
@@ -37,7 +37,16 @@ export function analyserPli(
       const defenseurs = [0,1,2,3].filter(id => id !== contrat.joueurId && id !== contrat.partenaireId);
       return defenseurs.includes(id1) && defenseurs.includes(id2);
     }
-    // Cas classique
+
+    // Cas solo (un contre tous)
+    if (contrat.seul) {
+      // Si l'un des deux est le soliste, ils ne sont pas partenaires
+      if (id1 === contrat.joueurId || id2 === contrat.joueurId) return false;
+      // Sinon, les deux sont des défenseurs, donc partenaires
+      return true;
+    }
+
+    // Cas classique (équipes fixes)
     return (id1 % 2) === (id2 % 2);
   };
 

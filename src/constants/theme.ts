@@ -84,23 +84,23 @@ export const FontWeight = {
 // ─── Dimensions des cartes ─────────────────────
 
 export const CardSize = {
-  // Carte en main (taille normale)
+  // Carte en main (taille augmentée pour confort)
   hand: {
-    width:  48,
-    height: 68,
-    radius: 6,
+    width:  64,
+    height: 90,
+    radius: 8,
   },
-  // Carte jouée sur la table (un peu plus grande)
+  // Carte jouée sur la table (bien plus grande)
   table: {
-    width:  42,
-    height: 60,
-    radius: 6,
+    width:  88,
+    height: 124,
+    radius: 12,
   },
   // Carte dos (adversaires)
   back: {
-    width:  28,
-    height: 40,
-    radius: 4,
+    width:  40,
+    height: 56,
+    radius: 5,
   },
   // Petite carte pour l'historique
   mini: {
@@ -110,9 +110,9 @@ export const CardSize = {
   },
   // Carte dos horizontale (côtés)
   backH: {
-    width:  40,
-    height: 28,
-    radius: 4,
+    width:  56,
+    height: 40,
+    radius: 5,
   },
 } as const;
 

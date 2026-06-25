@@ -113,7 +113,7 @@ export const Hand: React.FC<HandProps> = ({
             // Paramètres pour un éventail réaliste et uniforme
             const rotation = diff * (cartes.length > 10 ? 6 : 8);
             const translateY = Math.abs(diff) * (cartes.length > 10 ? 3 : 5);
-            const spread = (cartes.length > 10 ? 22 : 28);
+            const spread = (cartes.length > 10 ? 28 : 34);
 
             // On applique le décalage de couleur pour une séparation nette
             const translateX = (diff * spread) + (suitOffsets[index] - totalExtraOffset / 2);
@@ -227,7 +227,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'flex-end',
-    height: 160,
+    height: 180,
     width: SCREEN_WIDTH,
     paddingHorizontal: Spacing.xl,
     overflow: 'visible',

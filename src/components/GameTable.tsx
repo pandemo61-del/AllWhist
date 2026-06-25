@@ -2,15 +2,17 @@
 //  COMPOSANT — Table de jeu
 // ─────────────────────────────────────────────
 
-import React from 'react';
-import { View, Text, StyleSheet, Animated } from 'react-native';
-import { Carte, Couleur, Pli, ContratJoue, Joueur } from '../engine/types';
+import React, { useEffect, useRef } from 'react';
+import { View, Text, StyleSheet, Animated, Dimensions } from 'react-native';
+import { Carte, Couleur, Pli, ContratJoue, Joueur, CartePosee } from '../engine/types';
 import { CardFace, CardBack, HandBack } from './Card';
-import { SYMBOLE, LABEL_VALEUR } from '../engine/deck';
+import { SYMBOLE } from '../engine/deck';
 import {
   Colors, Spacing, FontSize, FontWeight,
   Radius, Shadows, CardSize,
 } from '../constants/theme';
+
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 // ─── Props ─────────────────────────────────────
 
@@ -20,12 +22,12 @@ interface GameTableProps {
   atout: Couleur | null;
   contrat: ContratJoue | null;
   tourDeJoueur: number;
-  plisTermines: Pli[];        // Tableau des plis finis
+  plisTermines: Pli[];
   partenaireRévélé: boolean;
   scores: number[];
 }
 
-// ─── Composant ─────────────────────────────────
+// ─── Composant Principal ───────────────────────
 
 export const GameTable: React.FC<GameTableProps> = ({
   joueurs,
@@ -35,41 +37,31 @@ export const GameTable: React.FC<GameTableProps> = ({
   tourDeJoueur,
   plisTermines,
   partenaireRévélé,
-  scores,
 }) => {
   const getPlisGagnes = (joueurId: number) => {
     return plisTermines.filter(p => p.gagnantId === joueurId).length;
   };
-
-  const carteJoueeParJoueur = (joueurId: number): Carte | undefined =>
-    pliEnCours.cartesJouees.find(c => c.joueurId === joueurId)?.carte;
-
-  // Calcul du score équipe/solo pour le badge
-  const nbPlisEquipe = contrat ? (
-    contrat.seul
-      ? getPlisGagnes(contrat.joueurId)
-      : (getPlisGagnes(contrat.joueurId) + (contrat.partenaireId !== undefined ? getPlisGagnes(contrat.partenaireId) : 0))
-  ) : 0;
 
   // Déterminer l'équipe de chaque joueur
   const getEquipe = (id: number): 'A' | 'B' | undefined => {
     if (!contrat) return undefined;
     const estAnnonceur = id === contrat.joueurId;
     const estPartenaire = partenaireRévélé && id === contrat.partenaireId;
-
     if (estAnnonceur || estPartenaire) return 'A';
-
-    // Si partenaire pas encore révélé, on ne marque que l'annonceur
     if (!partenaireRévélé && contrat.partenaireId !== undefined) {
       return estAnnonceur ? 'A' : undefined;
     }
-
-    return 'B'; // Défenseurs
+    return 'B';
   };
+
+  const nbPlisEquipe = contrat ? (
+    contrat.seul
+      ? getPlisGagnes(contrat.joueurId)
+      : (getPlisGagnes(contrat.joueurId) + (contrat.partenaireId !== undefined ? getPlisGagnes(contrat.partenaireId) : 0))
+  ) : 0;
 
   return (
     <View style={styles.table}>
-
       {/* ── Badges info ─────────────────────────── */}
       <View style={styles.badgesRow}>
         {atout && (
@@ -82,7 +74,6 @@ export const GameTable: React.FC<GameTableProps> = ({
             <Text style={styles.badgeTexte}>
               {contrat.nom}
               {contrat.atout ? ` (${SYMBOLE[contrat.atout]})` : ''}
-              {contrat.asPartenaire ? ` (As ${SYMBOLE[contrat.asPartenaire.couleur]})` : ''}
               : {nbPlisEquipe} / {contrat.plisObjectif}
             </Text>
           </View>
@@ -92,67 +83,58 @@ export const GameTable: React.FC<GameTableProps> = ({
         </View>
       </View>
 
-      {/* ── Joueur Nord (Partenaire / IA 1) ──────── */}
+      {/* ── Joueur Nord ──────── */}
       <PlayerSlot
         joueur={joueurs[2]}
         position="nord"
-        carteJouee={carteJoueeParJoueur(2)}
         estSonTour={tourDeJoueur === 2}
         plisManche={getPlisGagnes(2)}
         estPartenaire={partenaireRévélé && contrat?.partenaireId === 2}
         estAnnonceur={contrat?.joueurId === 2}
-        gagnantIdPli={pliEnCours.gagnantId}
         equipe={getEquipe(2)}
       />
 
-      {/* ── Rangée du milieu ─────────────────────── */}
       <View style={styles.milieu}>
-
-        {/* Joueur Ouest (IA 1) */}
+        {/* Joueur Ouest */}
         <PlayerSlot
           joueur={joueurs[1]}
           position="ouest"
-          carteJouee={carteJoueeParJoueur(1)}
           estSonTour={tourDeJoueur === 1}
           plisManche={getPlisGagnes(1)}
           estPartenaire={partenaireRévélé && contrat?.partenaireId === 1}
           estAnnonceur={contrat?.joueurId === 1}
-          gagnantIdPli={pliEnCours.gagnantId}
           equipe={getEquipe(1)}
         />
 
-        {/* Zone du pli central */}
-        <ZonePli
-          pliEnCours={pliEnCours}
-          atout={atout}
-          contrat={contrat}
-        />
+        {/* ZONE DE JEU CENTRALE (Shared container for cards) */}
+        <View style={styles.zonePli}>
+          <TableCards
+            cartesJouees={pliEnCours.cartesJouees}
+            gagnantId={pliEnCours.gagnantId}
+          />
+        </View>
 
-        {/* Joueur Est (IA 3) */}
+        {/* Joueur Est */}
         <PlayerSlot
           joueur={joueurs[3]}
           position="est"
-          carteJouee={carteJoueeParJoueur(3)}
           estSonTour={tourDeJoueur === 3}
           plisManche={getPlisGagnes(3)}
           estPartenaire={partenaireRévélé && contrat?.partenaireId === 3}
           estAnnonceur={contrat?.joueurId === 3}
-          gagnantIdPli={pliEnCours.gagnantId}
           equipe={getEquipe(3)}
         />
       </View>
 
-      {/* ── Joueur Sud (Humain) ──────────────────── */}
+      {/* Joueur Sud */}
       <PlayerSlot
         joueur={joueurs[0]}
         position="sud"
-        carteJouee={carteJoueeParJoueur(0)}
         estSonTour={tourDeJoueur === 0}
         plisManche={getPlisGagnes(0)}
         estPartenaire={partenaireRévélé && contrat?.partenaireId === 0}
         estAnnonceur={contrat?.joueurId === 0}
         estHumain
-        gagnantIdPli={pliEnCours.gagnantId}
         equipe={getEquipe(0)}
       />
     </View>
@@ -160,111 +142,165 @@ export const GameTable: React.FC<GameTableProps> = ({
 };
 
 // ──────────────────────────────────────────────
-//  Slot d'un joueur
+//  COMPOSANT — TableCards (Overlay des cartes jouées)
+// ──────────────────────────────────────────────
+
+interface TableCardsProps {
+  cartesJouees: CartePosee[];
+  gagnantId?: number;
+}
+
+const TableCards: React.FC<TableCardsProps> = ({ cartesJouees, gagnantId }) => {
+  return (
+    <View style={styles.cardsOverlay}>
+      {cartesJouees.map((cp, index) => (
+        <AnimatedPlayedCard
+          key={`${cp.carte.id}_${index}`}
+          cartePosee={cp}
+          playOrder={index}
+          isTrickFinished={gagnantId !== undefined}
+          gagnantId={gagnantId}
+        />
+      ))}
+    </View>
+  );
+};
+
+// ──────────────────────────────────────────────
+//  COMPOSANT — AnimatedPlayedCard
+// ──────────────────────────────────────────────
+
+interface AnimatedPlayedCardProps {
+  cartePosee: CartePosee;
+  playOrder: number;
+  isTrickFinished: boolean;
+  gagnantId?: number;
+}
+
+const AnimatedPlayedCard: React.FC<AnimatedPlayedCardProps> = ({
+  cartePosee, playOrder, isTrickFinished, gagnantId
+}) => {
+  const { joueurId, carte } = cartePosee;
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const scaleAnim = useRef(new Animated.Value(0.5)).current;
+  const moveAnim = useRef(new Animated.ValueXY({ x: 0, y: 0 })).current;
+  const flipAnim = useRef(new Animated.Value(0)).current;
+
+  // Déterminer la position cible sur la table pour ce joueur
+  const POS_MAP: Record<number, { x: number, y: number }> = {
+    0: { x: 0,   y: 60  }, // Sud
+    1: { x: -70, y: 0   }, // Ouest
+    2: { x: 0,   y: -60 }, // Nord
+    3: { x: 70,  y: 0   }, // Est
+  };
+
+  const pos = POS_MAP[joueurId];
+
+  // Animation d'entrée
+  useEffect(() => {
+    Animated.parallel([
+      Animated.timing(fadeAnim, { toValue: 1, duration: 300, useNativeDriver: true }),
+      Animated.spring(scaleAnim, { toValue: 1, friction: 6, tension: 40, useNativeDriver: true }),
+      Animated.spring(moveAnim, {
+        toValue: { x: pos.x, y: pos.y },
+        friction: 7, tension: 30, useNativeDriver: true
+      }),
+    ]).start();
+  }, []);
+
+  // Animation de fin de pli
+  useEffect(() => {
+    if (isTrickFinished && gagnantId !== undefined) {
+      const winnerPos = POS_MAP[gagnantId];
+
+      Animated.sequence([
+        Animated.delay(800), // Laisser le temps de voir la 4ème carte
+        // 1. Flip
+        Animated.timing(flipAnim, { toValue: 1, duration: 400, useNativeDriver: true }),
+        // 2. Déplacement groupé vers le gagnant
+        Animated.parallel([
+          Animated.timing(moveAnim, {
+            toValue: { x: winnerPos.x, y: winnerPos.y },
+            duration: 600,
+            useNativeDriver: true,
+          }),
+          Animated.timing(fadeAnim, {
+            toValue: 0,
+            duration: 600,
+            useNativeDriver: true,
+          }),
+          Animated.timing(scaleAnim, {
+            toValue: 0.8,
+            duration: 600,
+            useNativeDriver: true,
+          }),
+        ])
+      ]).start();
+    }
+  }, [isTrickFinished, gagnantId]);
+
+  const frontRotation = flipAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['0deg', '180deg'],
+  });
+  const backRotation = flipAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['180deg', '360deg'],
+  });
+
+  return (
+    <Animated.View style={[
+      styles.animatedCardWrapper,
+      {
+        zIndex: playOrder + 1, // Le dernier est toujours au dessus
+        opacity: fadeAnim,
+        transform: [
+          { translateX: moveAnim.x },
+          { translateY: moveAnim.y },
+          { scale: scaleAnim },
+        ]
+      }
+    ]}>
+      {/* Recto */}
+      <Animated.View style={{ backfaceVisibility: 'hidden', transform: [{ rotateY: frontRotation }] }}>
+        <CardFace carte={carte} taille="table" />
+      </Animated.View>
+
+      {/* Verso (apparaît pendant le flip) */}
+      <Animated.View style={[StyleSheet.absoluteFill, { backfaceVisibility: 'hidden', transform: [{ rotateY: backRotation }] }]}>
+        <CardBack style={{ width: CardSize.table.width, height: CardSize.table.height }} />
+      </Animated.View>
+    </Animated.View>
+  );
+};
+
+// ──────────────────────────────────────────────
+//  COMPOSANT — Slot Joueur (Avatar + Info)
 // ──────────────────────────────────────────────
 
 interface PlayerSlotProps {
   joueur: Joueur;
   position: 'nord' | 'sud' | 'est' | 'ouest';
-  carteJouee?: Carte;
   estSonTour: boolean;
   plisManche: number;
   estPartenaire: boolean;
   estAnnonceur: boolean;
   estHumain?: boolean;
-  gagnantIdPli?: number;
-  equipe?: 'A' | 'B'; // A: Annonceur/Partenaire, B: Défenseurs
+  equipe?: 'A' | 'B';
 }
 
 const PlayerSlot: React.FC<PlayerSlotProps> = ({
-  joueur,
-  position,
-  carteJouee,
-  estSonTour,
-  plisManche,
-  estPartenaire,
-  estAnnonceur,
-  estHumain = false,
-  gagnantIdPli,
-  equipe,
+  joueur, position, estSonTour, plisManche, estPartenaire, estAnnonceur, estHumain, equipe
 }) => {
   const isHoriz = position === 'est' || position === 'ouest';
-  const isLeft = position === 'ouest';
-  const fadeAnim = React.useRef(new Animated.Value(0)).current;
-  const moveAnim = React.useRef(new Animated.ValueXY({ x: 0, y: 0 })).current;
-
-  React.useEffect(() => {
-    if (carteJouee) {
-      // Apparition
-      Animated.spring(fadeAnim, {
-        toValue: 1,
-        tension: 50,
-        friction: 7,
-        useNativeDriver: true,
-      }).start();
-    } else {
-      fadeAnim.setValue(0);
-      moveAnim.setValue({ x: 0, y: 0 });
-    }
-  }, [carteJouee]);
-
-  // Animation vers le vainqueur
-  React.useEffect(() => {
-    if (gagnantIdPli !== undefined && carteJouee) {
-      const posMap: Record<number, string> = { 0: 'sud', 1: 'ouest', 2: 'nord', 3: 'est' };
-      const vPos = posMap[gagnantIdPli]; // position du vainqueur
-
-      // Coordonnées virtuelles pour calculer le vecteur de direction
-      const coords: Record<string, {x: number, y: number}> = {
-        nord: { x: 0, y: -0.8 },
-        sud:  { x: 0, y: 0.8 },
-        est:  { x: 0.9, y: 0 },
-        ouest: { x: -0.9, y: 0 }
-      };
-
-      const monCoord = coords[position];
-      const vainqueurCoord = coords[vPos];
-
-      // Calcul du déplacement vers le vainqueur
-      const DIST_X = 120;
-      const DIST_Y = 100;
-      const toX = (vainqueurCoord.x - monCoord.x) * DIST_X;
-      const toY = (vainqueurCoord.y - monCoord.y) * DIST_Y;
-
-      // Si je suis le vainqueur, ma carte ne bouge pas
-      const isWinner = posMap[gagnantIdPli] === position;
-
-      Animated.sequence([
-        // Ramassage immédiat (toujours en recto)
-        Animated.timing(moveAnim, {
-          toValue: { x: isWinner ? 0 : toX, y: isWinner ? 0 : toY },
-          duration: 600,
-          useNativeDriver: true,
-        }),
-        // Les cartes sont regroupées : on attend 2 secondes
-        Animated.delay(2000),
-        // Disparition finale
-        Animated.timing(fadeAnim, {
-          toValue: 0,
-          duration: 400,
-          useNativeDriver: true,
-        })
-      ]).start();
-    }
-  }, [gagnantIdPli]);
-
   const teamColor = equipe === 'A' ? Colors.primary : Colors.error;
-  const teamLabel = equipe === 'A' ? 'Offensive' : 'Défense';
 
   return (
     <View style={[
       styles.playerSlot,
       styles[`slot_${position}`],
       estSonTour && styles.slotActif,
-      equipe && { backgroundColor: equipe === 'A' ? 'rgba(29, 158, 117, 0.05)' : 'rgba(226, 75, 74, 0.05)' }
     ]}>
-
-      {/* Indicateur d'équipe visuel */}
       {equipe && (
         <View style={[
           styles.teamIndicator,
@@ -273,76 +309,22 @@ const PlayerSlot: React.FC<PlayerSlotProps> = ({
         ]} />
       )}
 
-      {/* Carte jouée (animation) */}
-      {carteJouee && (
-        <Animated.View style={[
-          styles.cartePoseeAbsolue,
-          styles[`cartePosee_${position}`],
-          {
-            opacity: fadeAnim,
-            transform: [
-              { scale: fadeAnim.interpolate({ inputRange: [0, 1], outputRange: [0.5, 1] }) },
-              { translateY: Animated.add(moveAnim.y, fadeAnim.interpolate({ inputRange: [0, 1], outputRange: [20, 0] })) },
-              { translateX: moveAnim.x }
-            ]
-          }
-        ]}>
-          <CardFace carte={carteJouee} taille="table" />
-        </Animated.View>
-      )}
-
-      {/* Dos des cartes (IA) */}
       {!estHumain && (
-        <HandBack
-          nbCartes={joueur.main.length}
-          orientation={isHoriz ? 'horizontal' : 'horizontal'}
-        />
+        <HandBack nbCartes={joueur.main.length} />
       )}
 
-      {/* Nom + score */}
       <View style={[styles.playerInfo, isHoriz && styles.playerInfoH]}>
         {estSonTour && <View style={styles.tourIndicateur} />}
         <View style={styles.nameWithBadge}>
-          <Text style={[
-            styles.playerNom,
-            (estPartenaire || estAnnonceur) && styles.playerNomPartenaire,
-          ]}>
-            {joueur.nom}
-            {estHumain ? ' (Vous)' : ''}
+          <Text style={[styles.playerNom, (estPartenaire || estAnnonceur) && styles.playerNomPartenaire]}>
+            {joueur.nom}{estHumain ? ' (Vous)' : ''}
           </Text>
           {(estAnnonceur || estPartenaire) && (
-            <View style={styles.roleBadge}>
-               <Text style={styles.roleBadgeText}>{estAnnonceur ? '🎯' : '🤝'}</Text>
-            </View>
+            <View style={styles.roleBadge}><Text style={styles.roleBadgeText}>{estAnnonceur ? '🎯' : '🤝'}</Text></View>
           )}
         </View>
-        <Text style={styles.playerScore}>
-          {plisManche} pli{plisManche > 1 ? 's' : ''}
-        </Text>
+        <Text style={styles.playerScore}>{plisManche} pli{plisManche > 1 ? 's' : ''}</Text>
       </View>
-    </View>
-  );
-};
-
-// ──────────────────────────────────────────────
-//  Zone centrale du pli
-// ──────────────────────────────────────────────
-
-interface ZonePliProps {
-  pliEnCours: Pli;
-  atout: Couleur | null;
-  contrat: ContratJoue | null;
-}
-
-const ZonePli: React.FC<ZonePliProps> = ({ pliEnCours, contrat }) => {
-  return (
-    <View style={styles.zonePli}>
-      {pliEnCours.cartesJouees.length === 0 && (
-        <Text style={styles.pliVide}>
-          {contrat ? `${contrat.nom}` : 'En attente…'}
-        </Text>
-      )}
-      {/* Les cartes sont maintenant gérées par les PlayerSlots pour être "à côté" des joueurs */}
     </View>
   );
 };
@@ -355,13 +337,18 @@ const styles = StyleSheet.create({
     borderRadius: Radius.xl,
     padding: Spacing.sm,
     marginHorizontal: Spacing.sm,
+    height: 480, // Hauteur fixe pour stabiliser la table
+    justifyContent: 'space-between',
   },
-
   badgesRow: {
     flexDirection: 'row',
     justifyContent: 'center',
     gap: Spacing.xs,
-    marginBottom: Spacing.xs,
+    position: 'absolute',
+    top: Spacing.sm,
+    left: 0,
+    right: 0,
+    zIndex: 200,
   },
   badge: {
     backgroundColor: Colors.bgSurface,
@@ -370,160 +357,54 @@ const styles = StyleSheet.create({
     paddingVertical: 3,
     borderWidth: 0.5,
     borderColor: Colors.border,
+    ...Shadows.panel,
   },
-  badgeContrat: {
-    backgroundColor: Colors.primaryDark,
-    borderColor: Colors.primary,
-  },
-  badgeTexte: {
-    fontSize: FontSize.xs,
-    color: Colors.textSecondary,
-    fontWeight: FontWeight.medium,
-    letterSpacing: 0.3,
-  },
+  badgeContrat: { backgroundColor: Colors.primaryDark, borderColor: Colors.primary },
+  badgeTexte: { fontSize: FontSize.xs, color: Colors.textSecondary, fontWeight: FontWeight.medium },
 
-  // Slots joueurs
-  playerSlot: {
-    alignItems: 'center',
-    paddingVertical: Spacing.xs,
-    position: 'relative',
-    minHeight: 80,
-    justifyContent: 'center',
-  },
-  slot_nord: {
-    marginBottom: Spacing.xs,
-  },
-  slot_sud: {
-    marginTop: Spacing.xs,
-  },
-  slot_est: {
-    flex: 0,
-    width: 80,
-  },
-  slot_ouest: {
-    flex: 0,
-    width: 80,
-  },
-  slotActif: {
-    // Légère surbrillance
-  },
-  playerInfo: {
-    alignItems: 'center',
-    marginTop: 3,
-    flexDirection: 'row',
-    gap: 4,
-  },
-  playerInfoH: {
-    flexDirection: 'column',
-    gap: 2,
-  },
-  tourIndicateur: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: Colors.primary,
-  },
-  playerNom: {
-    fontSize: FontSize.xs,
-    color: Colors.textMuted,
-    fontWeight: FontWeight.medium,
-    textTransform: 'uppercase',
-    letterSpacing: 0.4,
-  },
-  playerNomPartenaire: {
-    color: Colors.primary,
-    fontWeight: FontWeight.bold,
-  },
-  nameWithBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  roleBadge: {
-    backgroundColor: Colors.bgSurface,
-    borderRadius: Radius.sm,
-    paddingHorizontal: 2,
-    borderWidth: 0.5,
-    borderColor: Colors.border,
-  },
-  roleBadgeText: {
-    fontSize: 12,
-  },
-  teamIndicator: {
-    position: 'absolute',
-    width: 4,
-    height: '60%',
-    borderRadius: 2,
-  },
-  playerScore: {
-    fontSize: FontSize.xs,
-    color: Colors.textSecondary,
-    fontWeight: FontWeight.semibold,
-  },
-
-  // Cartes posées à côté des joueurs
-  cartePoseeAbsolue: {
-    position: 'absolute',
-    ...Shadows.card,
-    zIndex: 50, // Augmenté pour être sûr que c'est visible
-  },
-  cartePosee_nord: {
-    top: 50, // Ajusté pour visibilité
-  },
-  cartePosee_sud: {
-    bottom: 50,
-  },
-  cartePosee_est: {
-    right: 50,
-  },
-  cartePosee_ouest: {
-    left: 50,
-  },
-
-  // Rangée milieu
   milieu: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    flex: 1,
   },
-
-  // Zone pli
   zonePli: {
     flex: 1,
-    height: 120, // Augmenté pour éviter superposition
-    position: 'relative',
+    height: '100%',
     justifyContent: 'center',
     alignItems: 'center',
   },
-  pliVide: {
-    fontSize: FontSize.xs,
-    color: Colors.textMuted,
-    textAlign: 'center',
-    fontStyle: 'italic',
+  cardsOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
-  carteJoueeWrapper: {
+  animatedCardWrapper: {
     position: 'absolute',
     ...Shadows.card,
   },
-  carteGagnante: {
-    borderWidth: 2,
-    borderColor: Colors.primary,
-    borderRadius: CardSize.table.radius,
-  },
-  gagnantBadge: {
-    position: 'absolute',
-    bottom: 4,
-    right: 4,
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    backgroundColor: Colors.primary,
-    justifyContent: 'center',
+
+  playerSlot: {
     alignItems: 'center',
+    paddingVertical: Spacing.xs,
+    position: 'relative',
+    minHeight: 90,
+    justifyContent: 'center',
   },
-  gagnantTexte: {
-    fontSize: FontSize.xs,
-    color: '#fff',
-    fontWeight: FontWeight.bold,
-  },
+  slot_nord: { marginTop: Spacing.xl },
+  slot_sud: { marginBottom: Spacing.sm },
+  slot_est: { width: 80 },
+  slot_ouest: { width: 80 },
+  slotActif: {},
+
+  playerInfo: { alignItems: 'center', marginTop: 5, flexDirection: 'row', gap: 4 },
+  playerInfoH: { flexDirection: 'column', gap: 2 },
+  tourIndicateur: { width: 8, height: 8, borderRadius: 4, backgroundColor: Colors.primary },
+  playerNom: { fontSize: FontSize.xs, color: Colors.textMuted, fontWeight: FontWeight.medium, textTransform: 'uppercase' },
+  playerNomPartenaire: { color: Colors.primary, fontWeight: FontWeight.bold },
+  nameWithBadge: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  roleBadge: { backgroundColor: Colors.bgSurface, borderRadius: Radius.sm, paddingHorizontal: 2, borderWidth: 0.5, borderColor: Colors.border },
+  roleBadgeText: { fontSize: 12 },
+  teamIndicator: { position: 'absolute', width: 4, height: '60%', borderRadius: 2 },
+  playerScore: { fontSize: FontSize.xs, color: Colors.textSecondary, fontWeight: FontWeight.semibold },
 });

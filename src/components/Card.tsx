@@ -78,8 +78,8 @@ export const CardFace: React.FC<CardProps> = ({
   const isTable = taille === 'table';
 
   // Tailles de police adaptatives
-  const fontSizeValeur = isMini ? 12 : (isTable ? 16 : 20);
-  const fontSizeSymCorner = isMini ? 8 : (isTable ? 10 : 14);
+  const fontSizeValeur = isMini ? 14 : (isTable ? 24 : 26);
+  const fontSizeSymCorner = isMini ? 10 : (isTable ? 16 : 18);
 
   const cardStyle = [
     styles.card,
@@ -87,7 +87,7 @@ export const CardFace: React.FC<CardProps> = ({
       width: dim.width,
       height: dim.height,
       borderRadius: dim.radius,
-      padding: isMini ? 2 : 4,
+      padding: isMini ? 3 : 6,
     },
     selectionne && styles.selectionne,
     !jouable && styles.nonJouable,
@@ -122,10 +122,10 @@ export const CardFace: React.FC<CardProps> = ({
         {symImage ? (
           <Image
             source={symImage}
-            style={{ width: isMini ? 18 : 32, height: isMini ? 18 : 32, resizeMode: 'contain' }}
+            style={{ width: isMini ? 18 : 42, height: isMini ? 18 : 42, resizeMode: 'contain' }}
           />
         ) : (
-          <Text style={[styles.symboleCentral, { color: couleurTexte, fontSize: isMini ? 24 : 40 }]}>★</Text>
+          <Text style={[styles.symboleCentral, { color: couleurTexte, fontSize: isMini ? 24 : 54 }]}>★</Text>
         )}
       </View>
 
