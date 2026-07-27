@@ -45,13 +45,27 @@ export const GameTable: React.FC<GameTableProps> = ({
   // Déterminer l'équipe de chaque joueur
   const getEquipe = (id: number): 'A' | 'B' | undefined => {
     if (!contrat) return undefined;
+
     const estAnnonceur = id === contrat.joueurId;
-    const estPartenaire = partenaireRévélé && id === contrat.partenaireId;
-    if (estAnnonceur || estPartenaire) return 'A';
-    if (!partenaireRévélé && contrat.partenaireId !== undefined) {
-      return estAnnonceur ? 'A' : undefined;
+
+    // Cas Solo / Abondance / Misère (Seul contre tous)
+    if (contrat.seul) {
+      return estAnnonceur ? 'A' : 'B';
     }
-    return 'B';
+
+    // Cas avec partenaire secret (Demande / Trou)
+    if (contrat.partenaireId !== undefined || !contrat.seul) {
+      if (estAnnonceur) return 'A';
+      if (partenaireRévélé && id === contrat.partenaireId) return 'A';
+
+      // Si partenaire pas encore révélé, on ne sait pas qui est avec qui
+      if (!partenaireRévélé) return undefined;
+
+      // Partenaire révélé, les deux autres sont l'équipe B
+      return 'B';
+    }
+
+    return undefined;
   };
 
   const nbPlisEquipe = contrat ? (
@@ -92,6 +106,7 @@ export const GameTable: React.FC<GameTableProps> = ({
         estPartenaire={partenaireRévélé && contrat?.partenaireId === 2}
         estAnnonceur={contrat?.joueurId === 2}
         equipe={getEquipe(2)}
+        rotationCards="180deg"
       />
 
       <View style={styles.milieu}>
@@ -104,6 +119,8 @@ export const GameTable: React.FC<GameTableProps> = ({
           estPartenaire={partenaireRévélé && contrat?.partenaireId === 1}
           estAnnonceur={contrat?.joueurId === 1}
           equipe={getEquipe(1)}
+          orientation="vertical"
+          rotationCards="-90deg"
         />
 
         {/* ZONE DE JEU CENTRALE (Shared container for cards) */}
@@ -111,6 +128,7 @@ export const GameTable: React.FC<GameTableProps> = ({
           <TableCards
             cartesJouees={pliEnCours.cartesJouees}
             gagnantId={pliEnCours.gagnantId}
+            pliNum={pliEnCours.numero}
           />
         </View>
 
@@ -123,6 +141,8 @@ export const GameTable: React.FC<GameTableProps> = ({
           estPartenaire={partenaireRévélé && contrat?.partenaireId === 3}
           estAnnonceur={contrat?.joueurId === 3}
           equipe={getEquipe(3)}
+          orientation="vertical"
+          rotationCards="90deg"
         />
       </View>
 
@@ -150,12 +170,12 @@ interface TableCardsProps {
   gagnantId?: number;
 }
 
-const TableCards: React.FC<TableCardsProps> = ({ cartesJouees, gagnantId }) => {
+const TableCards: React.FC<TableCardsProps & { pliNum: number }> = ({ cartesJouees, gagnantId, pliNum }) => {
   return (
     <View style={styles.cardsOverlay}>
       {cartesJouees.map((cp, index) => (
         <AnimatedPlayedCard
-          key={`${cp.carte.id}_${index}`}
+          key={`${pliNum}_${cp.carte.id}_${index}`} // Clé plus unique pour forcer le remount
           cartePosee={cp}
           playOrder={index}
           isTrickFinished={gagnantId !== undefined}
@@ -181,63 +201,76 @@ const AnimatedPlayedCard: React.FC<AnimatedPlayedCardProps> = ({
   cartePosee, playOrder, isTrickFinished, gagnantId
 }) => {
   const { joueurId, carte } = cartePosee;
-  const fadeAnim = useRef(new Animated.Value(0)).current;
-  const scaleAnim = useRef(new Animated.Value(0.5)).current;
-  const moveAnim = useRef(new Animated.ValueXY({ x: 0, y: 0 })).current;
-  const flipAnim = useRef(new Animated.Value(0)).current;
 
-  // Déterminer la position cible sur la table pour ce joueur
-  const POS_MAP: Record<number, { x: number, y: number }> = {
-    0: { x: 0,   y: 60  }, // Sud
-    1: { x: -70, y: 0   }, // Ouest
-    2: { x: 0,   y: -60 }, // Nord
-    3: { x: 70,  y: 0   }, // Est
+  // Points de départ (venant des joueurs) pour éviter le spawn au centre
+  const START_POS: Record<number, { x: number, y: number }> = {
+    0: { x: 0,   y: 250 },
+    1: { x: -200, y: 0   },
+    2: { x: 0,   y: -250 },
+    3: { x: 200,  y: 0   },
   };
 
-  const pos = POS_MAP[joueurId];
+  const POS_MAP: Record<number, { x: number, y: number }> = {
+    0: { x: 0,   y: 100 }, // Sud (Encore plus proche du joueur)
+    1: { x: -80, y: 0   },
+    2: { x: 0,   y: -80 },
+    3: { x: 80,  y: 0   },
+  };
+
+  const startPos = START_POS[joueurId] || { x: 0, y: 0 };
+  const targetPos = POS_MAP[joueurId] || { x: 0, y: 0 };
+
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const scaleAnim = useRef(new Animated.Value(1)).current;
+  const moveAnim = useRef(new Animated.ValueXY(startPos)).current;
+  const flipAnim = useRef(new Animated.Value(0)).current;
+
+  const rotation = '0deg'; // Toutes les cartes à 0° comme demandé
 
   // Animation d'entrée
   useEffect(() => {
+    moveAnim.setValue(startPos);
+    fadeAnim.setValue(0);
+    scaleAnim.setValue(1);
+
     Animated.parallel([
-      Animated.timing(fadeAnim, { toValue: 1, duration: 300, useNativeDriver: true }),
-      Animated.spring(scaleAnim, { toValue: 1, friction: 6, tension: 40, useNativeDriver: true }),
+      Animated.timing(fadeAnim, { toValue: 1, duration: 200, useNativeDriver: true }),
       Animated.spring(moveAnim, {
-        toValue: { x: pos.x, y: pos.y },
-        friction: 7, tension: 30, useNativeDriver: true
+        toValue: targetPos,
+        friction: 8,
+        tension: 40,
+        useNativeDriver: true
       }),
     ]).start();
-  }, []);
+  }, [joueurId]);
 
   // Animation de fin de pli
   useEffect(() => {
     if (isTrickFinished && gagnantId !== undefined) {
-      const winnerPos = POS_MAP[gagnantId];
+      const winnerPos = POS_MAP[gagnantId] || { x: 0, y: 0 };
 
       Animated.sequence([
-        Animated.delay(1000), // Laisser le temps de voir le pli complet
-        // 1. Déplacement groupé vers le gagnant (côté face)
+        Animated.delay(1000),
         Animated.parallel([
           Animated.timing(moveAnim, {
-            toValue: { x: winnerPos.x, y: winnerPos.y },
-            duration: 700,
+            toValue: winnerPos,
+            duration: 600,
             useNativeDriver: true,
           }),
           Animated.timing(scaleAnim, {
-            toValue: 0.8,
-            duration: 700,
+            toValue: 1,
+            duration: 600,
             useNativeDriver: true,
           }),
         ]),
-        // 2. Retournement final (montre le dos)
         Animated.timing(flipAnim, {
           toValue: 1,
           duration: 400,
           useNativeDriver: true,
         }),
-        // 3. Disparition
         Animated.timing(fadeAnim, {
           toValue: 0,
-          duration: 300,
+          duration: 200,
           useNativeDriver: true,
         })
       ]).start();
@@ -257,11 +290,12 @@ const AnimatedPlayedCard: React.FC<AnimatedPlayedCardProps> = ({
     <Animated.View style={[
       styles.animatedCardWrapper,
       {
-        zIndex: playOrder + 1, // Le dernier est toujours au dessus
+        zIndex: playOrder + 1,
         opacity: fadeAnim,
         transform: [
           { translateX: moveAnim.x },
           { translateY: moveAnim.y },
+          { rotate: rotation },
           { scale: scaleAnim },
         ]
       }
@@ -292,12 +326,14 @@ interface PlayerSlotProps {
   estAnnonceur: boolean;
   estHumain?: boolean;
   equipe?: 'A' | 'B';
+  orientation?: 'horizontal' | 'vertical';
+  rotationCards?: string;
 }
 
 const PlayerSlot: React.FC<PlayerSlotProps> = ({
-  joueur, position, estSonTour, plisManche, estPartenaire, estAnnonceur, estHumain, equipe
+  joueur, position, estSonTour, plisManche, estPartenaire, estAnnonceur, estHumain, equipe, orientation = 'horizontal', rotationCards
 }) => {
-  const isHoriz = position === 'est' || position === 'ouest';
+  const isV = orientation === 'vertical';
   const teamColor = equipe === 'A' ? Colors.primary : Colors.error;
 
   return (
@@ -305,6 +341,7 @@ const PlayerSlot: React.FC<PlayerSlotProps> = ({
       styles.playerSlot,
       styles[`slot_${position}`],
       estSonTour && styles.slotActif,
+      isV && { flexDirection: 'row' }
     ]}>
       {equipe && (
         <View style={[
@@ -315,10 +352,10 @@ const PlayerSlot: React.FC<PlayerSlotProps> = ({
       )}
 
       {!estHumain && (
-        <HandBack nbCartes={joueur.main.length} />
+        <HandBack nbCartes={joueur.main.length} orientation={orientation} rotationCards={rotationCards} />
       )}
 
-      <View style={[styles.playerInfo, isHoriz && styles.playerInfoH]}>
+      <View style={[styles.playerInfo, !isV ? styles.playerInfoH : styles.playerInfoV]}>
         {estSonTour && <View style={styles.tourIndicateur} />}
         <View style={styles.nameWithBadge}>
           <Text style={[styles.playerNom, (estPartenaire || estAnnonceur) && styles.playerNomPartenaire]}>
@@ -403,7 +440,8 @@ const styles = StyleSheet.create({
   slotActif: {},
 
   playerInfo: { alignItems: 'center', marginTop: 5, flexDirection: 'row', gap: 4 },
-  playerInfoH: { flexDirection: 'column', gap: 2 },
+  playerInfoH: { flexDirection: 'row', gap: 4 },
+  playerInfoV: { flexDirection: 'column', gap: 2, marginLeft: 8 },
   tourIndicateur: { width: 8, height: 8, borderRadius: 4, backgroundColor: Colors.primary },
   playerNom: { fontSize: FontSize.xs, color: Colors.textMuted, fontWeight: FontWeight.medium, textTransform: 'uppercase' },
   playerNomPartenaire: { color: Colors.primary, fontWeight: FontWeight.bold },

@@ -145,15 +145,25 @@ export function evaluerForceMain(main: Carte[]): number {
 }
 
 /** Couleur la plus longue dans une main. */
-export function couleurLaPlusLongue(main: Carte[]): { couleur: Couleur; nb: number } {
+export function couleurLaPlusLongue(main: Carte[], preference?: Couleur[]): { couleur: Couleur; nb: number } {
   const compte: Partial<Record<Couleur, number>> = {};
   for (const c of main) {
     compte[c.couleur] = (compte[c.couleur] ?? 0) + 1;
   }
-  let best: Couleur = Couleur.PIQUE;
-  let bestNb = 0;
-  for (const [col, nb] of Object.entries(compte) as [Couleur, number][]) {
-    if (nb > bestNb) { best = col; bestNb = nb; }
+
+  let best: Couleur = preference ? preference[0] : Couleur.PIQUE;
+  let bestNb = -1;
+
+  // Si on a une préférence, on l'utilise pour départager les égalités
+  const ordre = preference || Object.values(Couleur);
+
+  for (const col of ordre) {
+    const nb = compte[col] ?? 0;
+    if (nb > bestNb) {
+      best = col;
+      bestNb = nb;
+    }
   }
+
   return { couleur: best, nb: bestNb };
 }

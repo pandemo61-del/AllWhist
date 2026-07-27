@@ -63,7 +63,7 @@ function forceValeur(valeur: number, ordreInverse: boolean): number {
   return ordreInverse ? (16 - valeur) : valeur;
 }
 
-function estPlusForte(
+export function estPlusForte(
   challenger: Carte,
   actuelle: Carte,
   couleurDemandee: Couleur,

@@ -208,6 +208,29 @@ export const MancheResultat: React.FC<MancheResultatProps> = ({
 
         <Text style={mancheStyles.details}>{details}</Text>
 
+        {/* --- CONSEIL DU COACH (NOUVEAU) --- */}
+        {!reussite && scoreManche.erreurs && scoreManche.erreurs.length > 0 && (
+          <View style={mancheStyles.coachContainer}>
+            <View style={mancheStyles.coachHeader}>
+              <Text style={mancheStyles.coachEmoji}>🧠</Text>
+              <Text style={mancheStyles.coachTitre}>Conseil du Coach</Text>
+            </View>
+            <View style={mancheStyles.coachContent}>
+              {scoreManche.erreurs.filter(e => e.joueurId === 0).slice(0, 2).map((err, i) => (
+                <View key={i} style={mancheStyles.errorItem}>
+                  <Text style={mancheStyles.errorTitle}>{err.titre}</Text>
+                  <Text style={mancheStyles.errorText}>{err.description}</Text>
+                </View>
+              ))}
+              {scoreManche.erreurs.filter(e => e.joueurId === 0).length === 0 && (
+                <Text style={mancheStyles.errorText}>
+                  Vous avez bien joué, mais la défense était trop forte ou la donne était difficile.
+                </Text>
+              )}
+            </View>
+          </View>
+        )}
+
         <View style={mancheStyles.section}>
           <Text style={mancheStyles.sectionLabel}>
             {estScenario ? "Résultat pédagogique" : "Cette manche"}
@@ -319,6 +342,22 @@ const mancheStyles = StyleSheet.create({
   rangFill: { height: '100%', borderRadius: Radius.full },
   rangNom: { fontSize: FontSize.sm, color: Colors.textSecondary, width: 60 },
   rangScore: { fontSize: FontSize.md, fontWeight: FontWeight.bold, color: Colors.textPrimary, width: 36, textAlign: 'right' },
+  coachContainer: {
+    backgroundColor: '#FFF9C4', // Jaune clair pédagogique
+    borderRadius: Radius.md,
+    padding: Spacing.md,
+    marginBottom: Spacing.md,
+    borderLeftWidth: 5,
+    borderLeftColor: Colors.warning,
+    elevation: 2,
+  },
+  coachHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: Spacing.xs },
+  coachEmoji: { fontSize: 20, marginRight: Spacing.sm },
+  coachTitre: { fontSize: FontSize.sm, fontWeight: FontWeight.bold, color: '#856404' },
+  coachContent: { gap: Spacing.sm },
+  errorItem: { borderBottomWidth: 0.5, borderBottomColor: 'rgba(0,0,0,0.1)', paddingBottom: 4 },
+  errorTitle: { fontSize: FontSize.xs, fontWeight: FontWeight.bold, color: Colors.error },
+  errorText: { fontSize: FontSize.xs, color: '#555', lineHeight: 16 },
   footerActions: {
     padding: Spacing.md,
     backgroundColor: Colors.bg,

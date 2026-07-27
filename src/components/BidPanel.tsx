@@ -7,10 +7,11 @@ import {
   View, Text, TouchableOpacity, ScrollView,
   StyleSheet, Modal,
 } from 'react-native';
-import { Carte, Couleur } from '../engine/types';
+import { Carte, Couleur, ContratJoue } from '../engine/types';
 import { ContratConfig, VariantConfig } from '../variants/types';
 import { SYMBOLE, estRouge } from '../engine/deck';
 import { choisirEnchere } from '../ai/SimpleAI';
+import { useSettingsStore } from '../store/settingsStore';
 import {
   Colors, Spacing, FontSize, FontWeight, Radius,
 } from '../constants/theme';
@@ -19,7 +20,7 @@ import {
 
 interface BidPanelProps {
   variante: VariantConfig;
-  meilleureEnchere: { id: string; priorite: number } | null;
+  meilleureEnchere: ContratJoue | null;
   joueurEnCours: string;   // nom
   onEnchere: (contratId: string, atout?: Couleur, asPartenaire?: Carte) => void;
   onPasse: () => void;
@@ -43,11 +44,13 @@ export const BidPanel: React.FC<BidPanelProps> = ({
   const [asPartenaireSel, setAsPartenaireSel] = useState<Carte | null>(null);
   const [etape, setEtape] = useState<'contrat' | 'atout' | 'as'>('contrat');
 
+  const ordreCouleurs = useSettingsStore(s => s.ordreCouleurs);
+
   // Recommendation IA pour l'apprentissage
   const recommendation = React.useMemo(() => {
     if (!modeApprentissage) return null;
-    return choisirEnchere(main, variante, meilleureEnchere as any, 'expert');
-  }, [main, variante, meilleureEnchere, modeApprentissage]);
+    return choisirEnchere(main, variante, meilleureEnchere as any, 'expert', ordreCouleurs);
+  }, [main, variante, meilleureEnchere, modeApprentissage, ordreCouleurs]);
 
   // Détection du Trou (3 As) ou Trou Royal (4 As) - Obligatoire au Whist de Gand
   const forceTrou = React.useMemo(() => {
@@ -55,6 +58,7 @@ export const BidPanel: React.FC<BidPanelProps> = ({
     const nbAs = main.filter(c => c.valeur === 14).length;
     const currentPriorite = meilleureEnchere?.priorite ?? -1;
 
+    // Le Trou n'est obligatoire que si personne n'a dit mieux
     if (nbAs === 3 && currentPriorite < 2) return 'trou';
     if (nbAs === 4 && currentPriorite < 3) return 'trou_royal';
     return null;
@@ -219,7 +223,7 @@ export const BidPanel: React.FC<BidPanelProps> = ({
           <View style={styles.section}>
             <Text style={styles.sectionLabel}>Choisir l'atout</Text>
             <View style={styles.atoutRow}>
-              {[Couleur.PIQUE, Couleur.COEUR, Couleur.CARREAU, Couleur.TREFLE].map(col => (
+              {ordreCouleurs.map(col => (
                 <TouchableOpacity
                   key={col}
                   style={[styles.atoutBtn, atoutSel === col && styles.atoutBtnSel]}

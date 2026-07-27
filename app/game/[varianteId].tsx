@@ -15,6 +15,7 @@ import { Hand }        from '../../src/components/Hand';
 import { BidPanel }    from '../../src/components/BidPanel';
 import { ContractAnnouncement } from '../../src/components/ContractAnnouncement';
 import { PliResultat, MancheResultat } from '../../src/components/ScorePanel';
+import { AdBanner } from '../../src/components/Ads';
 import { Colors, Spacing, FontSize, FontWeight, Radius } from '../../src/constants/theme';
 import { Carte, Couleur } from '../../src/engine/types';
 import { getVariante } from '../../src/variants/index';
@@ -210,6 +211,7 @@ export default function GameScreen() {
             }
             cartesVisibles={contratEnCours?.cartesVisibles}
           />
+          <AdBanner marginTop={Spacing.sm} />
         </View>
       )}
 

@@ -20,6 +20,8 @@ import {
 import { calculerScoreGenerique, construireScoreManche } from '../engine/scoring';
 import { getVariante, getContrat, VariantConfig } from '../variants/index';
 import { choisirCarte, choisirEnchere, NiveauIA } from '../ai/SimpleAI';
+import { analyserPli } from '../engine/analysis';
+import { useStatsStore } from './statsStore';
 import { translations } from '../i18n/translations';
 import { useSettingsStore } from './settingsStore';
 
@@ -227,6 +229,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
       cartesVisibles: contratConfig.cartesVisibles,
       pointsReussite: contratConfig.pointsReussite,
       pointsEchec: contratConfig.pointsEchec,
+      priorite: contratConfig.priorite,
     };
 
     const nouvelEtat: EtatEnchere = {
@@ -287,15 +290,25 @@ export const useGameStore = create<GameStore>((set, get) => ({
     // On attend que les animations de ramassage (2s + 1s mouvement) soient finies avant de nettoyer la table
     setTimeout(() => {
       if (mancheTerminee(nouveauxPlis)) {
+        // Analyser toutes les erreurs de la manche
+        const toutesErreurs = nouveauxPlis.flatMap(p => analyserPli(p, state.contratEnCours!, state.atout, nouveauxPlis));
+
         // Calculer le score de la manche
         const plisCpte = compterPlisParJoueur(nouveauxPlis);
         const variante = getVariante(state.varianteId);
         const contrat = state.contratEnCours!;
         const resultat = (variante.calculScore ?? calculerScoreGenerique)(contrat, plisCpte);
         const scoreManche = construireScoreManche(state.manche, contrat, plisCpte, resultat);
+        scoreManche.erreurs = toutesErreurs;
+
         const nouveauxScores = state.estScenario
           ? state.scores // Pas de changement pour les scénarios
           : state.scores.map((s, i) => s + (resultat.deltaScores[i] ?? 0));
+
+        // Enregistrer les stats si ce n'est pas un scénario
+        if (!state.estScenario) {
+          useStatsStore.getState().enregistrerManche(resultat.reussite, toutesErreurs, contrat.joueurId);
+        }
 
         set({
           phase: 'fin_manche',
@@ -548,15 +561,13 @@ export const useGameStore = create<GameStore>((set, get) => ({
     // IA enchérit
     const iaJoueur = state.joueurs[etatEnchere.joueurCourantId];
     const niveau = iaJoueur.type.replace('ia_', '') as NiveauIA;
-    const meilleureConfig = etatEnchere.meilleureEnchere
-      ? getContrat(variante, (etatEnchere.meilleureEnchere as any).id).priorite
-      : -1;
 
     const decision = choisirEnchere(
       iaJoueur.main,
       variante,
-      etatEnchere.meilleureEnchere ? { priorite: meilleureConfig } as any : null,
+      etatEnchere.meilleureEnchere,
       niveau,
+      // On pourrait passer les préférences de l'IA ici si on en avait
     );
 
     if (decision.action === 'passe') {

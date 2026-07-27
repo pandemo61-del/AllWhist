@@ -73,6 +73,7 @@ export interface ContratJoue {
   cartesVisibles: boolean;
   pointsReussite: number;
   pointsEchec: number;
+  priorite: number;     // Ajouté pour faciliter les comparaisons
 }
 
 // ─── Enchères ──────────────────────────────────
@@ -105,6 +106,7 @@ export interface ScoreManche {
   deltaScores: Record<number, number>;  // +/- de cette manche
   reussite: boolean;
   details: string;
+  erreurs?: any[]; // On utilisera le type de analysis.ts
 }
 
 // ─── État global de la partie ──────────────────

@@ -11,6 +11,7 @@ import { router } from 'expo-router';
 import { useGameStore } from '../src/store/gameStore';
 import { Colors, Spacing, FontSize, FontWeight, Radius } from '../src/constants/theme';
 import { useTranslation } from '../src/i18n';
+import { AdBanner } from '../src/components/Ads';
 
 // ─── Composant MenuItem animé ─────────────
 
@@ -177,7 +178,7 @@ export default function HomeScreen() {
             title={t('home.stats') || 'Statistiques'}
             subtitle={t('home.statsSub') || 'Historique · Taux de réussite'}
             iconColor="stats"
-            onPress={() => {}}
+            onPress={() => router.push('/stats')}
             animValue={menuAnimations[partieEnCours ? 3 : 2]}
           />
 
@@ -192,6 +193,9 @@ export default function HomeScreen() {
           />
 
         </View>
+
+        {/* Publicité */}
+        <AdBanner marginTop={Spacing.lg} />
 
         {/* ── Pied de page ─────────────────────── */}
         <Text style={styles.footer}>

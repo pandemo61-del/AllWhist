@@ -24,6 +24,7 @@ interface CardProps {
 interface CardBackProps {
   orientation?: 'vertical' | 'horizontal';
   taille?: 'normal' | 'mini';
+  rotation?: string; // Ajouté pour un contrôle précis
   style?: object;
 }
 
@@ -44,11 +45,15 @@ export const CardFace: React.FC<CardProps> = ({
   taille = 'normal',
   style,
 }) => {
-  const scaleAnim = useRef(new Animated.Value(0.95)).current;
-  const opacityAnim = useRef(new Animated.Value(0.8)).current;
+  const isTable = taille === 'table';
+  // Animation interne désactivée pour la table (conflit parent)
+  const scaleAnim = useRef(new Animated.Value(isTable ? 1 : 0.95)).current;
+  const opacityAnim = useRef(new Animated.Value(isTable ? 1 : 0.8)).current;
 
   // Animation d'apparition fluide
   useEffect(() => {
+    if (isTable) return; // Ne pas animer si c'est sur la table (géré par le parent)
+
     Animated.parallel([
       Animated.timing(scaleAnim, {
         toValue: 1,
@@ -63,7 +68,7 @@ export const CardFace: React.FC<CardProps> = ({
         useNativeDriver: true,
       }),
     ]).start();
-  }, [scaleAnim, opacityAnim]);
+  }, [scaleAnim, opacityAnim, isTable]);
 
   let dim = CardSize.hand;
   if (taille === 'table') dim = CardSize.table;
@@ -75,7 +80,6 @@ export const CardFace: React.FC<CardProps> = ({
   const symImage = !carte.estJoker ? ASSETS_COULEURS[carte.couleur] : null;
 
   const isMini = taille === 'mini';
-  const isTable = taille === 'table';
 
   // Tailles de police adaptatives
   const fontSizeValeur = isMini ? 14 : (isTable ? 32 : 18);
@@ -102,7 +106,7 @@ export const CardFace: React.FC<CardProps> = ({
   };
 
   const cardContent = (
-    <View style={cardStyle}>
+    <Animated.View style={[cardStyle, animatedCardStyle]}>
       {/* Coin haut-gauche */}
       <View style={[styles.corner, { gap: isMini ? -4 : -2 }]}>
         <Text style={[styles.valeur, { color: couleurTexte, fontSize: fontSizeValeur, lineHeight: fontSizeValeur }]}>
@@ -152,7 +156,7 @@ export const CardFace: React.FC<CardProps> = ({
       </View>
 
       {jouable && !isMini && <View style={styles.jouableIndicateur} />}
-    </View>
+    </Animated.View>
   );
 
   if (onPress) {
@@ -176,6 +180,7 @@ export const CardFace: React.FC<CardProps> = ({
 export const CardBack: React.FC<CardBackProps> = ({
   orientation = 'vertical',
   taille = 'normal',
+  rotation,
   style,
 }) => {
   const scaleAnim = useRef(new Animated.Value(0.9)).current;
@@ -190,7 +195,7 @@ export const CardBack: React.FC<CardBackProps> = ({
   }, [scaleAnim]);
 
   const isH = orientation === 'horizontal';
-  const dim  = taille === 'mini' ? CardSize.back : CardSize.back;
+  const dim = CardSize.back;
 
   return (
     <Animated.View
@@ -201,9 +206,14 @@ export const CardBack: React.FC<CardBackProps> = ({
           height: isH ? dim.width  : dim.height,
           borderRadius: dim.radius,
           overflow: 'hidden',
-          transform: [{ scale: scaleAnim }],
+          transform: [
+            { scale: scaleAnim },
+            { rotate: rotation || '0deg' }
+          ],
         },
         style,
+        // Forcer les dimensions passées en prop style (ex: CardSize.table)
+        style && (style as any).width ? { width: (style as any).width, height: (style as any).height } : {},
       ]}
     >
       <Image
@@ -219,17 +229,24 @@ export const CardBack: React.FC<CardBackProps> = ({
 interface HandBackProps {
   nbCartes: number;
   orientation?: 'horizontal' | 'vertical';
+  rotationCards?: string; // Rotation spécifique des cartes
 }
 
-export const HandBack: React.FC<HandBackProps> = ({ nbCartes, orientation = 'horizontal' }) => {
+export const HandBack: React.FC<HandBackProps> = ({ nbCartes, orientation = 'horizontal', rotationCards }) => {
   const visible = Math.min(nbCartes, 7);
+  const isV = orientation === 'vertical';
+
   return (
-    <View style={styles.handBackH}>
+    <View style={isV ? styles.handBackV : styles.handBackH}>
       {Array.from({ length: visible }).map((_, i) => (
         <CardBack
           key={i}
           orientation="vertical"
-          style={{ marginLeft: i === 0 ? 0 : -20 }}
+          rotation={rotationCards}
+          style={isV
+            ? { marginTop: i === 0 ? 0 : -45 }
+            : { marginLeft: i === 0 ? 0 : -20 }
+          }
         />
       ))}
     </View>
@@ -337,7 +354,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   handBackV: {
-    flexDirection: 'row', // Changé de column à row pour le landscape sur les côtés
+    flexDirection: 'column',
     alignItems: 'center',
   },
 });

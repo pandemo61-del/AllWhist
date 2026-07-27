@@ -3,7 +3,7 @@
 // ─────────────────────────────────────────────
 
 import { Carte, Couleur, Pli, ContratJoue, Joueur } from '../engine/types';
-import { cartesJouables } from '../engine/rules';
+import { cartesJouables, estPlusForte } from '../engine/rules';
 import {
   evaluerForceMain,
   couleurLaPlusLongue,
@@ -167,10 +167,33 @@ function eviterPrendreMain(
   pli: Pli,
   atout: Couleur | null,
 ): Carte {
-  // Pour misère : jouer la plus petite carte non-prenante
-  const sans = jouables.filter(c => c.couleur !== atout);
-  const petites = (sans.length > 0 ? sans : jouables).sort((a, b) => a.valeur - b.valeur);
-  return petites[0];
+  // Entame en misère : on joue la plus petite pour ne pas prendre
+  if (pli.cartesJouees.length === 0) {
+    return [...jouables].sort((a, b) => a.valeur - b.valeur)[0];
+  }
+
+  // 1. Trouver la meilleure carte actuelle du pli
+  let meilleurePli = pli.cartesJouees[0].carte;
+  for (let i = 1; i < pli.cartesJouees.length; i++) {
+    if (estPlusForte(pli.cartesJouees[i].carte, meilleurePli, pli.couleurDemandee!, atout)) {
+      meilleurePli = pli.cartesJouees[i].carte;
+    }
+  }
+
+  // 2. Trouver les cartes qui ne prennent pas le pli
+  const nonPrenantes = jouables.filter(c =>
+    !estPlusForte(c, meilleurePli, pli.couleurDemandee!, atout)
+  );
+
+  if (nonPrenantes.length > 0) {
+    // Règle experte : jouer la PLUS FORTE des cartes qui ne prennent pas.
+    // On garde les 2, 3, 4 pour les plis où les autres jouent très bas.
+    return nonPrenantes.sort((a, b) => b.valeur - a.valeur)[0];
+  }
+
+  // 3. Obligé de prendre : la misère est perdue.
+  // On joue la plus grosse carte possible pour s'en débarrasser (décharge).
+  return jouables.sort((a, b) => b.valeur - a.valeur)[0];
 }
 
 function meilleurEntame(
@@ -232,8 +255,9 @@ export interface DecisionEnchere {
 export function choisirEnchere(
   main: Carte[],
   variante: VariantConfig,
-  meilleureEnchere: ContratConfig | null,
+  meilleureEnchere: ContratJoue | null,
   niveau: NiveauIA,
+  preferenceCouleurs?: Couleur[],
 ): DecisionEnchere {
   // --- RÈGLES OBLIGATOIRES (Whist de Gand) ---
   if (variante.id === 'whist-gand') {
@@ -266,7 +290,7 @@ export function choisirEnchere(
   }
 
   const force = evaluerForceMain(main);
-  const { couleur: meilleureCol } = couleurLaPlusLongue(main);
+  const { couleur: meilleureCol } = couleurLaPlusLongue(main, preferenceCouleurs);
   const nbAtouts = cartesParCouleur(main, meilleureCol).length;
 
   // Seuils par niveau
