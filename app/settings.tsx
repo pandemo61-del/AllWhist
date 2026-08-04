@@ -137,6 +137,46 @@ export default function SettingsScreen() {
 
         </View>
 
+        <View style={styles.section}>
+          <Text style={styles.sectionTitre}>{t('settings.feedback') || 'Feedback'}</Text>
+
+          <View style={styles.option}>
+            <Text style={styles.optionLabel}>{t('settings.vibration') || 'Vibration'}</Text>
+            <View style={styles.btnGroup}>
+              <TouchableOpacity
+                style={[styles.btn, useSettingsStore.getState().vibration === true && styles.btnActive]}
+                onPress={() => useSettingsStore.getState().setVibration(true)}
+              >
+                <Text style={[styles.btnTexte, useSettingsStore.getState().vibration === true && styles.btnTexteActive]}>{t('common.yes') || 'Oui'}</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.btn, useSettingsStore.getState().vibration === false && styles.btnActive]}
+                onPress={() => useSettingsStore.getState().setVibration(false)}
+              >
+                <Text style={[styles.btnTexte, useSettingsStore.getState().vibration === false && styles.btnTexteActive]}>{t('common.no') || 'Non'}</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          <View style={styles.option}>
+            <Text style={styles.optionLabel}>{t('settings.sound') || 'Sons'}</Text>
+            <View style={styles.btnGroup}>
+              <TouchableOpacity
+                style={[styles.btn, useSettingsStore.getState().son === true && styles.btnActive]}
+                onPress={() => useSettingsStore.getState().setSon(true)}
+              >
+                <Text style={[styles.btnTexte, useSettingsStore.getState().son === true && styles.btnTexteActive]}>{t('common.yes') || 'Oui'}</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.btn, useSettingsStore.getState().son === false && styles.btnActive]}
+                onPress={() => useSettingsStore.getState().setSon(false)}
+              >
+                <Text style={[styles.btnTexte, useSettingsStore.getState().son === false && styles.btnTexteActive]}>{t('common.no') || 'Non'}</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+
       </ScrollView>
     </SafeAreaView>
   );

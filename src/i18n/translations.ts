@@ -16,6 +16,16 @@ export const translations: Record<Langue, any> = {
       settingsSub: 'Difficulté IA · Thème · Son',
       variantsCount: 'variantes',
     },
+    onboarding: {
+      step1Title: 'Bienvenue sur AllWhist !',
+      step1Sub: 'Le jeu de cartes le plus complet pour les amateurs de Whist.',
+      step2Title: 'Choisissez votre variante',
+      step2Sub: 'Du Whist de Gand au Bid Whist américain, tout est là.',
+      step3Title: 'Apprenez en jouant',
+      step3Sub: 'Des tutoriels intégrés vous guident pour chaque contrat.',
+      btnNext: 'Suivant',
+      btnStart: 'C\'est parti !',
+    },
     variantes: {
       playTitle: 'Choisir une variante',
       learnTitle: 'Quelle variante apprendre ?',
@@ -183,6 +193,9 @@ export const translations: Record<Langue, any> = {
       valueOrder: 'Ordre des valeurs',
       suitOrder: 'Ordre des couleurs',
       autoPlay: 'Jeu automatique',
+      feedback: 'Feedback',
+      vibration: 'Vibration',
+      sound: 'Sons',
     },
     alerts: {
       biddingOverTitle: 'Enchères terminées',
@@ -195,6 +208,7 @@ export const translations: Record<Langue, any> = {
       change: 'Changer',
       yes: 'Oui',
       no: 'Non',
+      thinking: 'Réflexion...',
     }
   },
   en: {
@@ -210,6 +224,16 @@ export const translations: Record<Langue, any> = {
       statsSub: 'History · Success rate',
       settingsSub: 'AI Difficulty · Theme · Sound',
       variantsCount: 'variants',
+    },
+    onboarding: {
+      step1Title: 'Welcome to AllWhist!',
+      step1Sub: 'The most comprehensive card game for Whist lovers.',
+      step2Title: 'Choose your variant',
+      step2Sub: 'From Ghent Whist to American Bid Whist, it\'s all here.',
+      step3Title: 'Learn while playing',
+      step3Sub: 'Built-in tutorials guide you through every contract.',
+      btnNext: 'Next',
+      btnStart: 'Let\'s go!',
     },
     variantes: {
       playTitle: 'Choose a variant',
@@ -337,6 +361,9 @@ export const translations: Record<Langue, any> = {
       valueOrder: 'Value Order',
       suitOrder: 'Suit Order',
       autoPlay: 'Auto Play',
+      feedback: 'Feedback',
+      vibration: 'Vibration',
+      sound: 'Sound',
     },
     alerts: {
       biddingOverTitle: 'Bidding finished',
@@ -349,6 +376,7 @@ export const translations: Record<Langue, any> = {
       change: 'Change',
       yes: 'Yes',
       no: 'No',
+      thinking: 'Thinking...',
     }
   },
   nl: {

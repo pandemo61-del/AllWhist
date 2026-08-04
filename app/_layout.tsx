@@ -7,9 +7,16 @@ import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import mobileAds from 'react-native-google-mobile-ads';
 import { Colors } from '../src/constants/theme';
+import { loginAnonymously } from '../src/services/firebase';
+import { initializeSync } from '../src/services/syncManager';
 
 export default function RootLayout() {
   useEffect(() => {
+    // Initialisation Firebase & Sync
+    loginAnonymously().then(() => {
+      initializeSync();
+    });
+
     // Initialisation asynchrone du SDK
     mobileAds()
       .initialize()

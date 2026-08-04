@@ -5,7 +5,7 @@
 import React, { useState } from 'react';
 import {
   View, Text, TouchableOpacity, ScrollView,
-  StyleSheet, Modal,
+  StyleSheet, Modal, Vibration,
 } from 'react-native';
 import { Carte, Couleur, ContratJoue } from '../engine/types';
 import { ContratConfig, VariantConfig } from '../variants/types';
@@ -64,16 +64,41 @@ export const BidPanel: React.FC<BidPanelProps> = ({
     return null;
   }, [main, variante, meilleureEnchere]);
 
-  // Contrats disponibles (priorité > enchère actuelle)
+  // Est-on le partenaire d'un Trou annoncé ?
+  const peutBoucher = React.useMemo(() => {
+    if (variante.id !== 'whist-gand' || !meilleureEnchere) return false;
+    if (meilleureEnchere.id !== 'trou' && meilleureEnchere.id !== 'trou_royal') return false;
+
+    const targetAce = meilleureEnchere.asPartenaire;
+    if (!targetAce) return false;
+
+    return main.some(c => c.valeur === targetAce.valeur && c.couleur === targetAce.couleur);
+  }, [main, variante, meilleureEnchere]);
+
+  // Contrats disponibles
   const contratsDisponibles = variante.contrats.filter(c => {
     if (c.id === 'passe') return false;
 
-    // Si on a 3 ou 4 As, on ne peut choisir QUE le Trou correspondant
-    if (forceTrou) {
-      return c.id === forceTrou;
+    const currentPrio = meilleureEnchere?.priorite ?? -1;
+
+    // L'annonce "Demande" doit toujours être disponible tant qu'aucune enchère
+    // supérieure (Solo, Misère...) n'a été placée.
+    if (c.id === 'demande') {
+      return currentPrio <= 1;
     }
 
-    return c.priorite > (meilleureEnchere?.priorite ?? -1);
+    // Si on a 3 ou 4 As, on est forcé de proposer un Trou,
+    // mais on laisse "Demande" par flexibilité comme demandé.
+    if (forceTrou) {
+      return c.id === forceTrou || c.id === 'demande';
+    }
+
+    // Vérifier si le contrat est disponible selon la main
+    if (c.disponibleSi && !c.disponibleSi(main, meilleureEnchere as any)) {
+      return false;
+    }
+
+    return c.priorite > currentPrio;
   });
 
   // Si on est forcé de jouer Trou, on sélectionne le contrat immédiatement
@@ -102,6 +127,7 @@ export const BidPanel: React.FC<BidPanelProps> = ({
 
   const handleConfirmer = () => {
     if (!contratSel) return;
+    const { vibration } = useSettingsStore.getState();
 
     // Pour le Trou, l'atout est la couleur de l'As demandé
     let atoutFinal = atoutSel;
@@ -109,6 +135,7 @@ export const BidPanel: React.FC<BidPanelProps> = ({
       atoutFinal = asPartenaireSel.couleur;
     }
 
+    if (vibration) Vibration.vibrate(40);
     onEnchere(contratSel.id, atoutFinal ?? undefined, asPartenaireSel ?? undefined);
 
     // Reset
@@ -285,12 +312,19 @@ export const BidPanel: React.FC<BidPanelProps> = ({
           )}
 
           <TouchableOpacity
-            style={[styles.btnPasse, forceTrou && styles.btnDisabled]}
-            onPress={onPasse}
+            style={[
+              styles.btnPasse,
+              forceTrou && styles.btnDisabled,
+              peutBoucher && { borderColor: Colors.primary, backgroundColor: Colors.bgSurface }
+            ]}
+            onPress={() => {
+              if (useSettingsStore.getState().vibration) Vibration.vibrate(20);
+              onPasse();
+            }}
             disabled={!!forceTrou}
           >
-            <Text style={styles.btnPasseTexte}>
-              {forceTrou ? "Trou Obligatoire" : "Passer"}
+            <Text style={[styles.btnPasseTexte, peutBoucher && { color: Colors.primary, fontWeight: 'bold' }]}>
+              {forceTrou ? "Trou Obligatoire" : (peutBoucher ? "Je bouche (Accepter)" : "Passer")}
             </Text>
           </TouchableOpacity>
         </View>
@@ -327,11 +361,10 @@ export const BidOverlay: React.FC<BidOverlayProps> = ({ visible, nomJoueur, cont
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.bg,
-    padding: Spacing.md,
+    padding: Spacing.xs,
   },
   header: {
-    marginBottom: Spacing.md,
+    marginBottom: Spacing.sm,
   },
   titre: {
     fontSize: FontSize.xl,

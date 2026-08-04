@@ -5,7 +5,8 @@
 import React, { useState, useCallback } from 'react';
 import {
   View, ScrollView, Text, TouchableOpacity,
-  StyleSheet, Animated, Dimensions,
+  StyleSheet, Animated, Dimensions, Easing,
+  Vibration,
 } from 'react-native';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -13,6 +14,7 @@ import { Carte } from '../engine/types';
 import { CardFace } from './Card';
 import { Colors, Spacing, FontSize, FontWeight, Radius } from '../constants/theme';
 import { useTranslation } from '../i18n';
+import { useSettingsStore } from '../store/settingsStore';
 
 interface HandProps {
   cartes: Carte[];
@@ -31,20 +33,31 @@ export const Hand: React.FC<HandProps> = ({
 }) => {
   const { t } = useTranslation();
   const [carteSelectionnee, setCarteSelectionnee] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [playingCardId, setPlayingCardId] = useState<string | null>(null);
+
+  // Valeur animée pour le mouvement de "jeu" de la carte
+  const playAnim = React.useRef(new Animated.Value(0)).current;
 
   const jouablesIds = new Set(cartesJouables.map(c => c.id));
-  const peutJouer = phase === 'jeu' && cartesJouables.length > 0;
+  const peutJouer = phase === 'jeu' && cartesJouables.length > 0 && !isSubmitting;
 
-  // Reset de la sélection si elle n'est plus jouable ou si le tour passe
+  // Reset de la sélection et du verrou si le tour change
   React.useEffect(() => {
+    if (phase !== 'jeu') {
+      setIsSubmitting(false);
+      setPlayingCardId(null);
+      playAnim.setValue(0);
+    }
     if (carteSelectionnee && (!peutJouer || !jouablesIds.has(carteSelectionnee))) {
       setCarteSelectionnee(null);
     }
-  }, [peutJouer, jouablesIds, carteSelectionnee]);
+  }, [peutJouer, jouablesIds, carteSelectionnee, phase, playAnim]);
 
   const getLabel = () => {
     switch (phase) {
       case 'jeu':
+        if (isSubmitting) return t('hand.waiting') || 'Envoi...';
         return peutJouer ? t('hand.yourTurn') : t('hand.invalidCard');
       case 'encheres':
         return t('hand.biddingHand');
@@ -54,22 +67,33 @@ export const Hand: React.FC<HandProps> = ({
   };
 
   const handlePress = useCallback((carte: Carte) => {
-    // On permet la sélection même si on ne peut pas jouer (pour voir les détails)
-    if (carteSelectionnee === carte.id) {
-      if (peutJouer && jouablesIds.has(carte.id)) {
-        // Animation avant de confirmer
-        setCarteSelectionnee(null);
-        // On laisse un petit délai pour que l'action soit visible
-        setTimeout(() => onJouerCarte(carte), 100);
-      } else {
-        setCarteSelectionnee(null);
-      }
-    } else {
-      setCarteSelectionnee(carte.id);
-    }
-  }, [carteSelectionnee, peutJouer, jouablesIds, onJouerCarte]);
+    if (isSubmitting || playingCardId) return;
 
-  const carteSelObj = cartes.find(c => c.id === carteSelectionnee);
+    const jouable = jouablesIds.has(carte.id) && peutJouer;
+    const isSelected = carteSelectionnee === carte.id;
+    const { vibration } = useSettingsStore.getState();
+
+    if (isSelected && jouable) {
+      // Deuxième clic sur une carte déjà sélectionnée et jouable -> On joue !
+      setPlayingCardId(carte.id);
+      setIsSubmitting(true);
+      if (vibration) Vibration.vibrate(50); // Vibration courte au lancer
+
+      // Animation qui "lance" la carte vers le centre
+      Animated.timing(playAnim, {
+        toValue: 1,
+        duration: 450,
+        easing: Easing.bezier(0.4, 0, 0.2, 1),
+        useNativeDriver: true,
+      }).start(() => {
+        onJouerCarte(carte);
+      });
+    } else {
+      // Premier clic ou carte non jouable -> On met en évidence ou on désélectionne
+      if (vibration && !isSelected) Vibration.vibrate(10); // Micro-vibration au touché
+      setCarteSelectionnee(prev => prev === carte.id ? null : carte.id);
+    }
+  }, [carteSelectionnee, isSubmitting, peutJouer, jouablesIds, onJouerCarte, playingCardId, playAnim]);
 
   return (
     <View style={styles.container}>
@@ -104,6 +128,7 @@ export const Hand: React.FC<HandProps> = ({
           return cartes.map((carte, index) => {
             const jouable = jouablesIds.has(carte.id) && peutJouer;
             const sel = carteSelectionnee === carte.id;
+            const isPlaying = playingCardId === carte.id;
             const estEnchere = phase === 'encheres';
 
             const isFirstOfSuit = index === 0 || cartes[index - 1].couleur !== carte.couleur;
@@ -115,22 +140,60 @@ export const Hand: React.FC<HandProps> = ({
             const translateY = Math.abs(diff) * (cartes.length > 10 ? 1 : 2);
             const spread = (cartes.length > 10 ? 20 : 24);
 
-            // On applique le décalage de couleur pour une séparation nette
-            const translateX = (diff * spread) + (suitOffsets[index] - totalExtraOffset / 2);
+            // On applique le décalage de couleur pour une séparation nette + un décalage global vers la gauche
+            const handShift = -20;
+            const translateX = (diff * spread) + (suitOffsets[index] - totalExtraOffset / 2) + handShift;
+
+            // Animation de jet de carte vers le tapis (position finale sur la table)
+            const animatedTranslateY = isPlaying
+              ? playAnim.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [-60, -140], // Réduit (était à -220) pour éviter que la carte ne monte trop haut
+                })
+              : (sel ? -60 : translateY);
+
+            const animatedTranslateX = isPlaying
+              ? playAnim.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [translateX, 0], // Se centre horizontalement
+                })
+              : translateX;
+
+            const animatedRotate = isPlaying
+              ? playAnim.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [`${rotation}deg`, '0deg'], // Redressement
+                })
+              : `${rotation}deg`;
+
+            const animatedOpacity = isPlaying
+              ? playAnim.interpolate({
+                  inputRange: [0, 0.9, 1],
+                  outputRange: [1, 1, 0.2], // Transition douce vers la carte de la table
+                })
+              : 1;
+
+            const animatedScale = isPlaying
+              ? playAnim.interpolate({
+                  inputRange: [0, 0.5, 1],
+                  outputRange: [1.2, 2.2, 1.96], // Ratio 90/46 pour taille table exacte
+                })
+              : (sel ? 1.2 : 1);
 
             return (
-              <View
+              <Animated.View
                 key={carte.id}
                 style={[
                   styles.carteWrapper,
                   {
                     transform: [
-                      { translateX },
-                      { translateY: sel ? -60 : translateY },
-                      { rotate: `${rotation}deg` },
-                      { scale: sel ? 1.2 : 1 },
+                      { translateX: animatedTranslateX },
+                      { translateY: animatedTranslateY },
+                      { rotate: animatedRotate },
+                      { scale: animatedScale },
                     ],
-                    zIndex: sel ? 100 : index,
+                    zIndex: sel || isPlaying ? 100 : index,
+                    opacity: animatedOpacity,
                   }
                 ]}
               >
@@ -141,60 +204,20 @@ export const Hand: React.FC<HandProps> = ({
                   onPress={handlePress}
                   style={[
                     !sel && styles.carteShadow,
-                    // Bordure noire encore plus épaisse pour la visibilité
-                    isFirstOfSuit && {
+                    // Masquer la bordure de tri pendant le mouvement pour un rendu propre sur tapis
+                    isFirstOfSuit && !isPlaying && {
                       borderLeftWidth: 5,
                       borderLeftColor: '#000',
-                      // On rajoute un petit effet de relief sur le bord noir
                       borderTopLeftRadius: 0,
                       borderBottomLeftRadius: 0,
                     }
                   ]}
                 />
-              </View>
+              </Animated.View>
             );
           });
         })()}
       </View>
-
-      {/* Bouton de confirmation si une carte est sélectionnée */}
-      {carteSelObj && peutJouer && (
-        <View style={styles.confirmRow}>
-          <Text style={styles.confirmLabel}>
-            {t('hand.confirmPlay')}{' '}
-            <Text style={styles.confirmCard}>
-              {/* Afficher nom de la carte */}
-              {(() => {
-                if (carteSelObj.estJoker) return t('hand.joker');
-                let valStr: string = String(carteSelObj.valeur);
-                if (carteSelObj.valeur === 14) valStr = t('hand.ace');
-                else if (carteSelObj.valeur === 13) valStr = t('hand.king');
-                else if (carteSelObj.valeur === 12) valStr = t('hand.queen');
-                else if (carteSelObj.valeur === 11) valStr = t('hand.jack');
-
-                return `${valStr} ${t('hand.of')} ${t(`suits.${carteSelObj.couleur}`)}`;
-              })()}
-            </Text>{' '}?
-          </Text>
-          <View style={styles.confirmBtns}>
-            <TouchableOpacity
-              style={[styles.btn, styles.btnSecondaire]}
-              onPress={() => setCarteSelectionnee(null)}
-            >
-              <Text style={styles.btnSecondaireTexte}>{t('hand.cancel')}</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.btn, styles.btnPrimaire]}
-              onPress={() => {
-                setCarteSelectionnee(null);
-                onJouerCarte(carteSelObj);
-              }}
-            >
-              <Text style={styles.btnPrimaireTexte}>{t('hand.play')}</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      )}
     </View>
   );
 };
@@ -246,52 +269,5 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.2,
     shadowRadius: 4,
     elevation: 3,
-  },
-
-  // Zone de confirmation
-  confirmRow: {
-    backgroundColor: Colors.bgSurface,
-    borderRadius: Radius.lg,
-    marginHorizontal: Spacing.md,
-    marginTop: Spacing.sm,
-    padding: Spacing.md,
-    borderWidth: 0.5,
-    borderColor: Colors.border,
-  },
-  confirmLabel: {
-    fontSize: FontSize.sm,
-    color: Colors.textSecondary,
-    textAlign: 'center',
-    marginBottom: Spacing.sm,
-  },
-  confirmCard: {
-    color: Colors.textPrimary,
-    fontWeight: FontWeight.semibold,
-  },
-  confirmBtns: {
-    flexDirection: 'row',
-    gap: Spacing.sm,
-  },
-  btn: {
-    flex: 1,
-    paddingVertical: Spacing.sm,
-    borderRadius: Radius.md,
-    alignItems: 'center',
-  },
-  btnPrimaire: {
-    backgroundColor: Colors.primary,
-  },
-  btnPrimaireTexte: {
-    color: '#fff',
-    fontWeight: FontWeight.semibold,
-    fontSize: FontSize.sm,
-  },
-  btnSecondaire: {
-    borderWidth: 0.5,
-    borderColor: Colors.border,
-  },
-  btnSecondaireTexte: {
-    color: Colors.textMuted,
-    fontSize: FontSize.sm,
   },
 });

@@ -11,12 +11,16 @@ import {
   Colors, Spacing, FontSize, FontWeight,
   Radius, Shadows, CardSize,
 } from '../constants/theme';
+import { useTranslation } from '../i18n';
+
+import { getVariante } from '../variants/index';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 // ─── Props ─────────────────────────────────────
 
 interface GameTableProps {
+  varianteId: string;
   joueurs: Joueur[];
   pliEnCours: Pli;
   atout: Couleur | null;
@@ -25,11 +29,15 @@ interface GameTableProps {
   plisTermines: Pli[];
   partenaireRévélé: boolean;
   scores: number[];
+  children?: React.ReactNode;
+  centerContent?: React.ReactNode;
+  isBidding?: boolean;
 }
 
 // ─── Composant Principal ───────────────────────
 
 export const GameTable: React.FC<GameTableProps> = ({
+  varianteId,
   joueurs,
   pliEnCours,
   atout,
@@ -37,32 +45,39 @@ export const GameTable: React.FC<GameTableProps> = ({
   tourDeJoueur,
   plisTermines,
   partenaireRévélé,
+  children,
+  centerContent,
+  isBidding = false,
 }) => {
   const getPlisGagnes = (joueurId: number) => {
     return plisTermines.filter(p => p.gagnantId === joueurId).length;
   };
 
+  const currentVariante = getVariante(varianteId);
+
   // Déterminer l'équipe de chaque joueur
   const getEquipe = (id: number): 'A' | 'B' | undefined => {
+    // 1. Cas des variantes à équipes fixes (ex: Whist classique)
+    if (currentVariante?.equipeFixe) {
+      return (id % 2 === 0) ? 'A' : 'B';
+    }
+
     if (!contrat) return undefined;
 
     const estAnnonceur = id === contrat.joueurId;
 
     // Cas Solo / Abondance / Misère (Seul contre tous)
     if (contrat.seul) {
-      return estAnnonceur ? 'A' : 'B';
+      if (estAnnonceur) return 'A';
+      return 'B';
     }
 
     // Cas avec partenaire secret (Demande / Trou)
-    if (contrat.partenaireId !== undefined || !contrat.seul) {
-      if (estAnnonceur) return 'A';
-      if (partenaireRévélé && id === contrat.partenaireId) return 'A';
+    if (estAnnonceur) return 'A';
 
-      // Si partenaire pas encore révélé, on ne sait pas qui est avec qui
-      if (!partenaireRévélé) return undefined;
-
-      // Partenaire révélé, les deux autres sont l'équipe B
-      return 'B';
+    if (partenaireRévélé) {
+      const estPartenaire = id === contrat.partenaireId;
+      return estPartenaire ? 'A' : 'B';
     }
 
     return undefined;
@@ -75,88 +90,108 @@ export const GameTable: React.FC<GameTableProps> = ({
   ) : 0;
 
   return (
-    <View style={styles.table}>
-      {/* ── Badges info ─────────────────────────── */}
-      <View style={styles.badgesRow}>
-        {atout && (
+    <View style={[styles.table, children && styles.tableWithHand]}>
+      {/* ── Badges info (Toujours visibles ou masqués si enchères ?) ── */}
+      {!isBidding && (
+        <View style={styles.badgesRow}>
+          {atout && (
+            <View style={styles.badge}>
+              <Text style={styles.badgeTexte}>{SYMBOLE[atout]} Atout</Text>
+            </View>
+          )}
+          {contrat && (
+            <View style={[styles.badge, styles.badgeContrat]}>
+              <Text style={styles.badgeTexteBlanc}>
+                {contrat.nom}
+                {contrat.atout ? ` (${SYMBOLE[contrat.atout]})` : ''}
+                : {nbPlisEquipe} / {contrat.plisObjectif}
+              </Text>
+            </View>
+          )}
           <View style={styles.badge}>
-            <Text style={styles.badgeTexte}>{SYMBOLE[atout]} Atout</Text>
+            <Text style={styles.badgeTexte}>Pli {plisTermines.length + 1}/13</Text>
           </View>
-        )}
-        {contrat && (
-          <View style={[styles.badge, styles.badgeContrat]}>
-            <Text style={styles.badgeTexte}>
-              {contrat.nom}
-              {contrat.atout ? ` (${SYMBOLE[contrat.atout]})` : ''}
-              : {nbPlisEquipe} / {contrat.plisObjectif}
-            </Text>
-          </View>
-        )}
-        <View style={styles.badge}>
-          <Text style={styles.badgeTexte}>Pli {plisTermines.length + 1}/13</Text>
         </View>
-      </View>
+      )}
 
-      {/* ── Joueur Nord ──────── */}
-      <PlayerSlot
-        joueur={joueurs[2]}
-        position="nord"
-        estSonTour={tourDeJoueur === 2}
-        plisManche={getPlisGagnes(2)}
-        estPartenaire={partenaireRévélé && contrat?.partenaireId === 2}
-        estAnnonceur={contrat?.joueurId === 2}
-        equipe={getEquipe(2)}
-        rotationCards="180deg"
-      />
-
-      <View style={styles.milieu}>
-        {/* Joueur Ouest */}
-        <PlayerSlot
-          joueur={joueurs[1]}
-          position="ouest"
-          estSonTour={tourDeJoueur === 1}
-          plisManche={getPlisGagnes(1)}
-          estPartenaire={partenaireRévélé && contrat?.partenaireId === 1}
-          estAnnonceur={contrat?.joueurId === 1}
-          equipe={getEquipe(1)}
-          orientation="vertical"
-          rotationCards="-90deg"
-        />
-
-        {/* ZONE DE JEU CENTRALE (Shared container for cards) */}
-        <View style={styles.zonePli}>
-          <TableCards
-            cartesJouees={pliEnCours.cartesJouees}
-            gagnantId={pliEnCours.gagnantId}
-            pliNum={pliEnCours.numero}
+      {isBidding ? (
+        /* ── VUE ENCHÈRES : Panneau complet occupant tout le haut ── */
+        <View style={styles.biddingContent}>
+          {centerContent}
+        </View>
+      ) : (
+        /* ── VUE JEU : Disposition classique ── */
+        <>
+          {/* Joueur Nord */}
+          <PlayerSlot
+            joueur={joueurs[2]}
+            position="nord"
+            estSonTour={tourDeJoueur === 2}
+            plisManche={getPlisGagnes(2)}
+            estPartenaire={partenaireRévélé && contrat?.partenaireId === 2}
+            estAnnonceur={contrat?.joueurId === 2}
+            equipe={getEquipe(2)}
+            rotationCards="180deg"
           />
-        </View>
 
-        {/* Joueur Est */}
+          <View style={styles.milieu}>
+            <PlayerSlot
+              joueur={joueurs[1]}
+              position="ouest"
+              estSonTour={tourDeJoueur === 1}
+              plisManche={getPlisGagnes(1)}
+              estPartenaire={partenaireRévélé && contrat?.partenaireId === 1}
+              estAnnonceur={contrat?.joueurId === 1}
+              equipe={getEquipe(1)}
+              orientation="vertical"
+              rotationCards="-90deg"
+            />
+            <View style={styles.zonePliPlaceholder}>
+              {centerContent}
+            </View>
+            <PlayerSlot
+              joueur={joueurs[3]}
+              position="est"
+              estSonTour={tourDeJoueur === 3}
+              plisManche={getPlisGagnes(3)}
+              estPartenaire={partenaireRévélé && contrat?.partenaireId === 3}
+              estAnnonceur={contrat?.joueurId === 3}
+              equipe={getEquipe(3)}
+              orientation="vertical"
+              rotationCards="90deg"
+            />
+          </View>
+        </>
+      )}
+
+      {/* Joueur Sud + Main (Toujours présent) */}
+      <View style={styles.sudSection}>
         <PlayerSlot
-          joueur={joueurs[3]}
-          position="est"
-          estSonTour={tourDeJoueur === 3}
-          plisManche={getPlisGagnes(3)}
-          estPartenaire={partenaireRévélé && contrat?.partenaireId === 3}
-          estAnnonceur={contrat?.joueurId === 3}
-          equipe={getEquipe(3)}
-          orientation="vertical"
-          rotationCards="90deg"
+          joueur={joueurs[0]}
+          position="sud"
+          estSonTour={tourDeJoueur === 0}
+          plisManche={getPlisGagnes(0)}
+          estPartenaire={partenaireRévélé && contrat?.partenaireId === 0}
+          estAnnonceur={contrat?.joueurId === 0}
+          estHumain
+          equipe={getEquipe(0)}
+          objectif={contrat?.plisObjectif}
         />
+        {children && (
+          <View style={styles.handWrapperInside}>
+            {children}
+          </View>
+        )}
       </View>
 
-      {/* Joueur Sud */}
-      <PlayerSlot
-        joueur={joueurs[0]}
-        position="sud"
-        estSonTour={tourDeJoueur === 0}
-        plisManche={getPlisGagnes(0)}
-        estPartenaire={partenaireRévélé && contrat?.partenaireId === 0}
-        estAnnonceur={contrat?.joueurId === 0}
-        estHumain
-        equipe={getEquipe(0)}
-      />
+      {/* ZONE DE PLI (Rendered LAST to be on top of avatars) */}
+      <View style={[styles.zonePliAbsolute, { zIndex: 1000 }]} pointerEvents="none">
+        <TableCards
+          cartesJouees={pliEnCours.cartesJouees}
+          gagnantId={pliEnCours.gagnantId}
+          pliNum={pliEnCours.numero}
+        />
+      </View>
     </View>
   );
 };
@@ -211,9 +246,9 @@ const AnimatedPlayedCard: React.FC<AnimatedPlayedCardProps> = ({
   };
 
   const POS_MAP: Record<number, { x: number, y: number }> = {
-    0: { x: 0,   y: 100 }, // Sud (Encore plus proche du joueur)
+    0: { x: 0,   y: 70  }, // Sud (Remonté pour visibilité totale)
     1: { x: -80, y: 0   },
-    2: { x: 0,   y: -80 },
+    2: { x: 0,   y: -70 },
     3: { x: 80,  y: 0   },
   };
 
@@ -229,19 +264,28 @@ const AnimatedPlayedCard: React.FC<AnimatedPlayedCardProps> = ({
 
   // Animation d'entrée
   useEffect(() => {
-    moveAnim.setValue(startPos);
-    fadeAnim.setValue(0);
-    scaleAnim.setValue(1);
+    // Si c'est le joueur humain (0), la main a déjà fait l'animation de mouvement
+    // On fait apparaître la carte directement à sa cible pour un effet "seamless"
+    if (joueurId === 0) {
+      moveAnim.setValue(targetPos);
+      fadeAnim.setValue(0);
+      Animated.timing(fadeAnim, { toValue: 1, duration: 150, useNativeDriver: true }).start();
+    } else {
+      // Pour les IA, on garde l'animation de jet depuis leur avatar
+      moveAnim.setValue(startPos);
+      fadeAnim.setValue(0);
+      scaleAnim.setValue(1);
 
-    Animated.parallel([
-      Animated.timing(fadeAnim, { toValue: 1, duration: 200, useNativeDriver: true }),
-      Animated.spring(moveAnim, {
-        toValue: targetPos,
-        friction: 8,
-        tension: 40,
-        useNativeDriver: true
-      }),
-    ]).start();
+      Animated.parallel([
+        Animated.timing(fadeAnim, { toValue: 1, duration: 200, useNativeDriver: true }),
+        Animated.spring(moveAnim, {
+          toValue: targetPos,
+          friction: 8,
+          tension: 40,
+          useNativeDriver: true
+        }),
+      ]).start();
+    }
   }, [joueurId]);
 
   // Animation de fin de pli
@@ -328,27 +372,66 @@ interface PlayerSlotProps {
   equipe?: 'A' | 'B';
   orientation?: 'horizontal' | 'vertical';
   rotationCards?: string;
+  objectif?: number;
+  thinking?: boolean;
 }
 
 const PlayerSlot: React.FC<PlayerSlotProps> = ({
-  joueur, position, estSonTour, plisManche, estPartenaire, estAnnonceur, estHumain, equipe, orientation = 'horizontal', rotationCards
+  joueur, position, estSonTour, plisManche, estPartenaire, estAnnonceur, estHumain, equipe, orientation = 'horizontal', rotationCards, objectif, thinking
 }) => {
+  const { t } = useTranslation();
   const isV = orientation === 'vertical';
   const teamColor = equipe === 'A' ? Colors.primary : Colors.error;
+  const teamLabel = equipe ? `ÉQUIPE ${equipe}` : '';
+
+  // Animation pour le tour de joueur
+  const pulseAnim = useRef(new Animated.Value(1)).current;
+
+  useEffect(() => {
+    if (estSonTour) {
+      Animated.loop(
+        Animated.sequence([
+          Animated.timing(pulseAnim, {
+            toValue: 1.1,
+            duration: 800,
+            useNativeDriver: true,
+          }),
+          Animated.timing(pulseAnim, {
+            toValue: 1,
+            duration: 800,
+            useNativeDriver: true,
+          }),
+        ])
+      ).start();
+    } else {
+      pulseAnim.setValue(1);
+    }
+  }, [estSonTour]);
 
   return (
-    <View style={[
+    <Animated.View style={[
       styles.playerSlot,
       styles[`slot_${position}`],
       estSonTour && styles.slotActif,
-      isV && { flexDirection: 'row' }
+      isV && { flexDirection: 'row' },
+      equipe && {
+        borderColor: teamColor,
+        borderWidth: 2,
+        borderRadius: Radius.lg,
+        backgroundColor: equipe === 'A' ? 'rgba(29, 158, 117, 0.05)' : 'rgba(226, 75, 74, 0.05)'
+      },
+      {
+        transform: [{ scale: pulseAnim }]
+      }
     ]}>
       {equipe && (
         <View style={[
-          styles.teamIndicator,
+          styles.teamBadge,
           { backgroundColor: teamColor },
-          position === 'est' ? { right: 0 } : position === 'ouest' ? { left: 0 } : { top: 0, width: '100%', height: 3 }
-        ]} />
+          position === 'est' ? { left: -10, top: -10 } : { left: 5, top: -10 }
+        ]}>
+          <Text style={styles.teamBadgeText}>{teamLabel}</Text>
+        </View>
       )}
 
       {!estHumain && (
@@ -358,16 +441,18 @@ const PlayerSlot: React.FC<PlayerSlotProps> = ({
       <View style={[styles.playerInfo, !isV ? styles.playerInfoH : styles.playerInfoV]}>
         {estSonTour && <View style={styles.tourIndicateur} />}
         <View style={styles.nameWithBadge}>
-          <Text style={[styles.playerNom, (estPartenaire || estAnnonceur) && styles.playerNomPartenaire]}>
+          <Text style={[styles.playerNom, (estPartenaire || estAnnonceur) && styles.playerNomPartenaire, estSonTour && { color: Colors.primary }]}>
             {joueur.nom}{estHumain ? ' (Vous)' : ''}
           </Text>
           {(estAnnonceur || estPartenaire) && (
             <View style={styles.roleBadge}><Text style={styles.roleBadgeText}>{estAnnonceur ? '🎯' : '🤝'}</Text></View>
           )}
         </View>
-        <Text style={styles.playerScore}>{plisManche} pli{plisManche > 1 ? 's' : ''}</Text>
+        <Text style={[styles.playerScore, estHumain && styles.playerScoreHumain]}>
+          {(!estHumain && estSonTour) ? t('common.thinking') : `${plisManche}${objectif ? ` / ${objectif}` : ''} pli${plisManche > 1 ? 's' : ''}`}
+        </Text>
       </View>
-    </View>
+    </Animated.View>
   );
 };
 
@@ -381,6 +466,22 @@ const styles = StyleSheet.create({
     marginHorizontal: Spacing.sm,
     height: 480, // Hauteur fixe pour stabiliser la table
     justifyContent: 'space-between',
+  },
+  tableWithHand: {
+    height: 600, // Augmenter la hauteur pour inclure la main
+  },
+  sudSection: {
+    alignItems: 'center',
+    width: '100%',
+  },
+  biddingContent: {
+    flex: 1,
+    width: '100%',
+    paddingTop: Spacing.md,
+  },
+  handWrapperInside: {
+    width: SCREEN_WIDTH - Spacing.lg * 2,
+    marginTop: -20, // Chevaucher légèrement les infos joueur pour gagner de la place
   },
   badgesRow: {
     flexDirection: 'row',
@@ -403,11 +504,22 @@ const styles = StyleSheet.create({
   },
   badgeContrat: { backgroundColor: Colors.primaryDark, borderColor: Colors.primary },
   badgeTexte: { fontSize: FontSize.xs, color: Colors.textSecondary, fontWeight: FontWeight.medium },
+  badgeTexteBlanc: { fontSize: FontSize.xs, color: '#ffffff', fontWeight: FontWeight.bold },
 
   milieu: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    flex: 1,
+    zIndex: 1,
+  },
+  zonePliAbsolute: {
+    ...StyleSheet.absoluteFillObject,
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 1000,
+  },
+  zonePliPlaceholder: {
     flex: 1,
   },
   zonePli: {
@@ -448,6 +560,33 @@ const styles = StyleSheet.create({
   nameWithBadge: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   roleBadge: { backgroundColor: Colors.bgSurface, borderRadius: Radius.sm, paddingHorizontal: 2, borderWidth: 0.5, borderColor: Colors.border },
   roleBadgeText: { fontSize: 12 },
-  teamIndicator: { position: 'absolute', width: 4, height: '60%', borderRadius: 2 },
+  teamBadge: {
+    position: 'absolute',
+    paddingHorizontal: 6,
+    paddingVertical: 1,
+    borderRadius: Radius.sm,
+    zIndex: 10,
+    elevation: 3,
+  },
+  teamBadgeText: {
+    color: '#fff',
+    fontSize: 8,
+    fontWeight: FontWeight.bold,
+  },
+  playerScoreHumain: {
+    backgroundColor: Colors.primary,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: 4,
+    borderRadius: Radius.full,
+    color: '#fff',
+    fontSize: FontSize.md,
+    fontWeight: FontWeight.black,
+    marginTop: 4,
+    elevation: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 3,
+  },
   playerScore: { fontSize: FontSize.xs, color: Colors.textSecondary, fontWeight: FontWeight.semibold },
 });

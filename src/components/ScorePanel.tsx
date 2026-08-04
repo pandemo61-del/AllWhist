@@ -72,7 +72,10 @@ export const MancheResultat: React.FC<MancheResultatProps> = ({
           >
             <Text style={mancheStyles.backBtnTexte}>← Retour</Text>
           </TouchableOpacity>
-          <Text style={mancheStyles.titrePlis}>{contrat.nom}</Text>
+          <Text style={mancheStyles.titrePlis}>
+            {contrat.nom}
+            {contrat.atout ? ` (${SYMBOLE[contrat.atout]})` : (contrat.sanAtout ? ' (SA)' : '')}
+          </Text>
         </View>
 
         <View style={mancheStyles.plisTableauHeader}>

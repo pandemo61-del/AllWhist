@@ -1,8 +1,8 @@
 {
   "expo": {
-    "name": "AllWhist",
+    "name": "allWhist",
     "slug": "allwhist",
-    "version": "1.1.0",
+    "version": "1.0.2",
     "orientation": "default",
     "scheme": "allwhist",
     "userInterfaceStyle": "dark",
@@ -18,15 +18,15 @@
       "bundleIdentifier": "com.allwhist.app"
     },
     "android": {
-      "compileSdk": 35,
-      "targetSdk": 35,
-      "buildToolsVersion": "35.0.0",
+      "compileSdk": 36,
+      "targetSdk": 36,
+      "buildToolsVersion": "36.0.0",
       "adaptiveIcon": {
         "foregroundImage": "./assets/allwhist_adaptive_108x108.png",
         "backgroundColor": "#ffffff"
       },
       "package": "com.allwhist.app",
-      "versionCode": 2,
+      "versionCode": 3,
       "softwareKeyboardLayoutMode": "adjustResize",
       "statusBar": {
         "hidden": false,

@@ -4,6 +4,7 @@
 
 import { Pli, ContratJoue, Couleur, Carte } from './types';
 import { determinerGagnant } from './rules';
+import { LABEL_VALEUR } from './deck';
 
 export type AnalyseType = 'error' | 'warning' | 'good';
 
@@ -30,16 +31,21 @@ export function analyserPli(
 
   // 1. Identifier les partenaires
   const sontPartenaires = (id1: number, id2: number) => {
+    if (id1 === id2) return false;
+
+    // Cas spécial Whist de Gand
     if (contrat.partenaireId !== undefined) {
-      if (id1 === contrat.joueurId) return id2 === contrat.partenaireId;
-      if (id1 === contrat.partenaireId) return id2 === contrat.joueurId;
-      const defenseurs = [0, 1, 2, 3].filter(id => id !== contrat.joueurId && id !== contrat.partenaireId);
-      return defenseurs.includes(id1) && defenseurs.includes(id2);
+      const estEquipeA = (id: number) => id === contrat.joueurId || id === contrat.partenaireId;
+      return estEquipeA(id1) === estEquipeA(id2);
     }
+
+    // Cas Solo
     if (contrat.seul) {
       if (id1 === contrat.joueurId || id2 === contrat.joueurId) return false;
-      return true;
+      return true; // Les 3 autres sont partenaires
     }
+
+    // Par défaut
     return (id1 % 2) === (id2 % 2);
   };
 
@@ -60,6 +66,29 @@ export function analyserPli(
     const prevJoueurId = meilleurActuel.joueurId;
     const partenaireEnTete = sontPartenaires(joueurId, prevJoueurId);
 
+    // --- ANALYSE : SOUS-COUPE INUTILE ---
+    // Ne s'applique que si on coupe (couleurDemandee != atout)
+    if (atout && couleurDemandee !== atout && !partenaireEnTete && carte.couleur === atout && meilleurActuel.carte.couleur === atout) {
+      if (carte.valeur < meilleurActuel.carte.valeur) {
+        commentaires.push({
+          type: 'error',
+          titre: 'Sous-coupe inutile',
+          description: `Vous avez joué un atout plus faible que celui de l'adversaire. Vous perdez votre atout sans gagner le pli.`,
+          joueurId
+        });
+      }
+    }
+
+    // --- ANALYSE : COUPE MANQUÉE ---
+    if (atout && !partenaireEnTete && carte.couleur !== atout && carte.couleur !== couleurDemandee) {
+      // Le joueur a défaussé. S'il avait de l'atout dans sa main (on ne le sait pas ici sans mainComplete)
+      // mais on peut au moins vérifier si l'atout était une option plus forte
+      if (meilleurActuel.carte.couleur !== atout && pli.numero < 11) {
+          // Note: Cette règle est perfectible car on n'a pas la main complète dans cette fonction
+          // On pourrait ajouter un tag 'warning' pour inviter à la réflexion
+      }
+    }
+
     // --- ANALYSE : COUPER SUR SON PARTENAIRE ---
     if (partenaireEnTete && atout && carte.couleur === atout && meilleurActuel.carte.couleur !== atout) {
       if (!contrat.id.includes('misere') && pli.numero < 10) {
@@ -72,37 +101,88 @@ export function analyserPli(
       }
     }
 
+    // --- ANALYSE : SACRIFICE D'AS ---
+    if (!contrat.id.includes('misere') && carte.valeur === 14 && carte.couleur !== couleurDemandee && carte.couleur !== atout) {
+        commentaires.push({
+          type: 'error',
+          titre: "Sacrifice d'As",
+          description: `Vous avez défaussé un As alors que vous ne pouviez pas gagner le pli. C'est une carte maîtresse perdue.`,
+          joueurId
+        });
+    }
+
     // --- ANALYSE : SURMONTER SON PARTENAIRE ---
     if (partenaireEnTete && carte.valeur > meilleurActuel.carte.valeur && carte.couleur === meilleurActuel.carte.couleur) {
       if (!contrat.id.includes('misere')) {
+        const estAs = carte.valeur === 14;
         if (i === 3 || !peutEtreBattu(meilleurActuel.carte, pli, atout)) {
           commentaires.push({
-            type: 'warning',
-            titre: 'Surpasse inutile',
-            description: `Vous avez joué une carte plus forte que votre partenaire alors qu'il gagnait déjà le pli.`,
+            type: estAs ? 'error' : 'warning',
+            titre: estAs ? "Sacrifice d'As" : 'Surpasse inutile',
+            description: estAs
+              ? `Vous avez jeté un As sur le pli de votre partenaire qui gagnait déjà. C'est un énorme gaspillage.`
+              : `Vous avez joué une carte plus forte que votre partenaire alors qu'il gagnait déjà le pli.`,
             joueurId
           });
         }
       }
     }
 
+    // --- ANALYSE : DÉFAUSSE D'AS INUTILE ---
+    if (!contrat.id.includes('misere') && !partenaireEnTete && carte.valeur === 14 && carte.couleur !== couleurDemandee && carte.couleur !== atout) {
+        commentaires.push({
+          type: 'error',
+          titre: "Sacrifice d'As",
+          description: `Vous avez défaussé un As sur un pli perdu. Vous auriez dû le garder pour prendre la main plus tard.`,
+          joueurId
+        });
+    }
+
     // --- ANALYSE : GASPILLAGE DE PETITE CARTE (MISÈRE) ---
     if (contrat.id.includes('misere') && estSoliste(joueurId) && !partenaireEnTete) {
+      const estDernier = i === 3;
+
       // Si on joue une carte très basse (2, 3, 4) alors que la carte en tête est haute (10+)
-      if (carte.valeur <= 4 && meilleurActuel.carte.valeur >= 10) {
+      // et qu'on est le dernier à parler -> On aurait dû jeter une grosse carte !
+      if (estDernier && carte.valeur <= 6 && meilleurActuel.carte.valeur >= 10) {
         commentaires.push({
           type: 'warning',
           titre: 'Gaspillage de sécurité',
-          description: `En misère, ne jouez pas vos plus petites cartes trop tôt. Essayez de jouer une carte juste en-dessous de la plus forte du pli.`,
+          description: `En misère, quand vous êtes le dernier à parler et que le pli est déjà gagné par un autre, profitez-en pour jeter vos plus grosses cartes.`,
           joueurId
         });
       }
+
+      // À l'inverse, si on joue haut alors qu'on n'est pas le dernier
+      if (!estDernier && carte.valeur >= 10 && !estPlusForte(carte, meilleurActuel.carte, couleurDemandee!, atout)) {
+         // Si la carte maîtresse était encore plus haute (ex: Valet), c'est du nettoyage !
+         if (meilleurActuel.carte.valeur > carte.valeur) {
+            commentaires.push({
+              type: 'good',
+              titre: 'Bon nettoyage de main',
+              description: `En misère, jeter un ${LABEL_VALEUR[carte.valeur]} sous un ${LABEL_VALEUR[meilleurActuel.carte.valeur]} adverse est un excellent coup pour purger votre main.`,
+              joueurId
+            });
+         } else {
+            commentaires.push({
+              type: 'error',
+              titre: 'Prise de risque inutile',
+              description: `En misère, si vous n'êtes pas le dernier à parler, jouez vos plus petites cartes pour éviter qu'un joueur suivant ne vous force à prendre le pli.`,
+              joueurId
+            });
+         }
+      }
     }
 
-    // --- ANALYSE : MISERE (Défausse risquée) ---
-    if (contrat.id.includes('misere') && estSoliste(joueurId)) {
-      if (carte.valeur >= 10 && i < 3) {
-         // Le soliste joue une grosse carte trop tôt ?
+    // --- ANALYSE : MISERE (Entame) ---
+    if (contrat.id.includes('misere') && estSoliste(joueurId) && i === 0) {
+      if (carte.valeur >= 9) {
+        commentaires.push({
+          type: 'error',
+          titre: 'Entame dangereuse',
+          description: `Entamer avec une carte haute (${LABEL_VALEUR[carte.valeur]}) en misère est très risqué. Privilégiez vos plus petites cartes.`,
+          joueurId
+        });
       }
     }
 

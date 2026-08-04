@@ -9,9 +9,11 @@ import {
 } from 'react-native';
 import { router } from 'expo-router';
 import { useGameStore } from '../src/store/gameStore';
+import { useSettingsStore } from '../src/store/settingsStore';
 import { Colors, Spacing, FontSize, FontWeight, Radius } from '../src/constants/theme';
 import { useTranslation } from '../src/i18n';
 import { AdBanner } from '../src/components/Ads';
+import { WelcomeOverlay } from '../src/components/WelcomeOverlay';
 
 // ─── Composant MenuItem animé ─────────────
 
@@ -45,6 +47,7 @@ const MenuItem: React.FC<MenuItemProps> = ({
   return (
     <Animated.View
       style={{
+        flex: 1, // Permet à l'item de s'étendre verticalement
         opacity: animValue,
         transform: [
           {
@@ -82,8 +85,43 @@ const MenuItem: React.FC<MenuItemProps> = ({
 
 export default function HomeScreen() {
   const { t } = useTranslation();
+  const [isHydrated, setIsHydrated] = React.useState(false);
   const { phase, varianteId, scores } = useGameStore();
-  const partieEnCours = phase !== 'idle' && phase !== 'fin_partie';
+  const { hasSeenOnboarding, setHasSeenOnboarding } = useSettingsStore();
+  const [showOnboarding, setShowOnboarding] = React.useState(false);
+
+  useEffect(() => {
+    // Attendre que les stores soient chargés du stockage local
+    const unsubGame = useGameStore.persist.onFinishHydration(() => {
+      checkHydration();
+    });
+    const unsubSettings = useSettingsStore.persist.onFinishHydration(() => {
+      checkHydration();
+    });
+
+    const checkHydration = () => {
+      if (useGameStore.persist.hasHydrated() && useSettingsStore.persist.hasHydrated()) {
+        setIsHydrated(true);
+        if (!useSettingsStore.getState().hasSeenOnboarding) {
+          setShowOnboarding(true);
+        }
+      }
+    };
+
+    checkHydration();
+
+    return () => {
+      unsubGame();
+      unsubSettings();
+    };
+  }, []);
+
+  const handleCloseOnboarding = () => {
+    setShowOnboarding(false);
+    setHasSeenOnboarding(true);
+  };
+
+  const partieEnCours = isHydrated && phase !== 'idle' && phase !== 'fin_partie';
 
   // Animations des éléments
   const logoAnim = useRef(new Animated.Value(0)).current;
@@ -113,7 +151,10 @@ export default function HomeScreen() {
 
   return (
     <SafeAreaView style={styles.safe}>
-      <ScrollView contentContainerStyle={styles.scroll}>
+      <ScrollView
+        contentContainerStyle={styles.scroll}
+        showsVerticalScrollIndicator={false}
+      >
         <Animated.View
           style={[
             styles.logoZone,
@@ -138,7 +179,7 @@ export default function HomeScreen() {
           <Text style={styles.logoTagline}>{t('home.tagline') || 'Toutes les variantes du Whist'}</Text>
         </Animated.View>
 
-        {/* ── Menu principal ───────────────────── */}
+        {/* ── Menu principal (Zone flexible) ───────────── */}
         <View style={styles.menu}>
 
           {/* Nouvelle partie */}
@@ -193,16 +234,20 @@ export default function HomeScreen() {
           />
 
         </View>
-
-        {/* Publicité */}
-        <AdBanner marginTop={Spacing.lg} />
-
-        {/* ── Pied de page ─────────────────────── */}
-        <Text style={styles.footer}>
-          AllWhist v1.0 · 5 {t('home.variantsCount') || 'variantes'}
-        </Text>
-
       </ScrollView>
+
+      {/* ── Zone fixe en bas (Pub + Pied de page) ── */}
+      <View style={styles.fixedFooter}>
+        <AdBanner />
+        <Text style={styles.footer}>
+          AllWhist v1.1 · 5 {t('home.variantsCount') || 'variantes'}
+        </Text>
+      </View>
+
+      <WelcomeOverlay
+        visible={showOnboarding}
+        onClose={handleCloseOnboarding}
+      />
     </SafeAreaView>
   );
 }
@@ -215,29 +260,29 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.bg,
   },
   scroll: {
-    flexGrow: 1,
-    padding: Spacing.lg,
-    paddingBottom: Spacing.xxxl,
+    flexGrow: 1, // Permet au contenu de s'étendre pour remplir l'écran
+    paddingHorizontal: Spacing.lg,
+    paddingBottom: Spacing.md,
   },
 
   // Logo
   logoZone: {
     alignItems: 'center',
-    paddingVertical: Spacing.xxxl,
+    paddingVertical: Spacing.lg,
   },
   logoIcon: {
-    width: 100,
-    height: 100,
+    width: 90,
+    height: 90,
     borderRadius: Radius.xl,
-    marginBottom: Spacing.md,
+    marginBottom: Spacing.xs,
   },
   logoSym: {
-    fontSize: 30,
+    fontSize: 24,
     color: Colors.primary,
     fontWeight: FontWeight.black,
   },
   logoNom: {
-    fontSize: FontSize.xxxl,
+    fontSize: FontSize.xxl,
     fontWeight: FontWeight.black,
     color: Colors.textPrimary,
     letterSpacing: 1,
@@ -245,15 +290,19 @@ const styles = StyleSheet.create({
   logoTagline: {
     fontSize: FontSize.sm,
     color: Colors.textMuted,
-    marginTop: Spacing.xs,
+    marginTop: 2,
     letterSpacing: 0.5,
   },
 
   // Menu
   menu: {
-    gap: Spacing.sm,
+    flex: 1, // Occupe tout l'espace restant
+    gap: Spacing.xs,
+    justifyContent: 'center',
+    marginBottom: Spacing.md,
   },
   menuItem: {
+    flex: 1, // S'étire pour remplir le conteneur menu
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: Colors.bgCard,
@@ -262,6 +311,7 @@ const styles = StyleSheet.create({
     borderWidth: 0.5,
     borderColor: Colors.border,
     gap: Spacing.md,
+    minHeight: 64, // Sécurité pour petits écrans
   },
   menuItemPrimaire: {
     backgroundColor: Colors.primaryDark,
@@ -272,8 +322,8 @@ const styles = StyleSheet.create({
     backgroundColor: '#e3f2fd',
   },
   menuIcon: {
-    width: 42,
-    height: 42,
+    width: 40,
+    height: 40,
     borderRadius: Radius.md,
     justifyContent: 'center',
     alignItems: 'center',
@@ -299,18 +349,24 @@ const styles = StyleSheet.create({
   menuSous: {
     fontSize: FontSize.xs,
     color: Colors.textMuted,
-    marginTop: 2,
+    marginTop: 1,
   },
   menuChevron: {
-    fontSize: 22,
+    fontSize: 20,
     color: Colors.textMuted,
   },
 
+  fixedFooter: {
+    backgroundColor: Colors.bg,
+    borderTopWidth: 0.5,
+    borderTopColor: Colors.border,
+    paddingBottom: Spacing.xs,
+  },
   footer: {
     textAlign: 'center',
-    fontSize: FontSize.xs,
+    fontSize: 11,
     color: Colors.textMuted,
-    marginTop: Spacing.xxxl,
+    marginTop: 4,
     opacity: 0.5,
   },
 });

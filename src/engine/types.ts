@@ -127,4 +127,6 @@ export interface EtatPartie {
   historiqueManches: ScoreManche[];
   partenaireRévélé: boolean;    // pour Demande Gand
   estScenario: boolean;         // true si c'est une partie d'entraînement
+  sessionGameId?: string;       // ID unique pour grouper les manches d'une partie
+  notification?: { title: string; message: string } | null; // Pour les messages temporaires
 }

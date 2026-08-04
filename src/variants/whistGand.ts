@@ -51,6 +51,7 @@ export const WhistGand: VariantConfig = {
       pointsReussite: 16, pointsEchec: 16,
       sanAtout: false, cartesVisibles: false,
       priorite: 2,
+      disponibleSi: (main) => main.filter(c => c.valeur === 14).length === 3,
     },
     {
       id: 'trou_royal',
@@ -61,6 +62,7 @@ export const WhistGand: VariantConfig = {
       pointsReussite: 32, pointsEchec: 32,
       sanAtout: false, cartesVisibles: false,
       priorite: 3,
+      disponibleSi: (main) => main.filter(c => c.valeur === 14).length === 4,
     },
     {
       id: 'solo',

@@ -4,17 +4,21 @@
 
 import React from 'react';
 import { View, StyleSheet, Platform } from 'react-native';
-import { BannerAd, BannerAdSize, TestIds } from 'react-native-google-mobile-ads';
+import { BannerAd, BannerAdSize, TestIds, InterstitialAd, AdEventType } from 'react-native-google-mobile-ads';
 import { Colors } from '../constants/theme';
 
 // Identifiants de test fournis par Google
-// En production, vous devrez utiliser vos propres IDs
 const adUnitId = __DEV__
   ? TestIds.ADAPTIVE_BANNER
   : Platform.select({
-      android: 'ca-app-pub-3940256099942544/9214589741', // Test ID par défaut pour Android
+      android: 'ca-app-pub-4266277576724378/1183186255', // ID réel (supposé ou à confirmer, sinon garder test)
       ios: 'ca-app-pub-3940256099942544/2934735716',     // Test ID par défaut pour iOS
     }) || TestIds.ADAPTIVE_BANNER;
+
+// Identifiant pour l'interstitiel de fin de partie
+export const INTERSTITIAL_ID = __DEV__
+  ? TestIds.INTERSTITIAL
+  : 'ca-app-pub-4266277576724378/8938170215';
 
 interface AdBannerProps {
   marginTop?: number;

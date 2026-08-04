@@ -6,6 +6,8 @@
 //    const { phase, jouerCarte } = useGameStore();
 
 import { create } from 'zustand';
+import { persist, createJSONStorage } from 'zustand/middleware';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Alert } from 'react-native';
 import {
   EtatPartie, PhaseJeu, Joueur, Pli, ContratJoue,
@@ -24,6 +26,7 @@ import { analyserPli } from '../engine/analysis';
 import { useStatsStore } from './statsStore';
 import { translations } from '../i18n/translations';
 import { useSettingsStore } from './settingsStore';
+import { auth, saveGame } from '../services/firebase';
 
 import { Scenario } from '../data/scenarios';
 
@@ -91,6 +94,8 @@ const ETAT_INITIAL: EtatPartie = {
   historiqueManches: [],
   partenaireRévélé: false,
   estScenario: false,
+  sessionGameId: '',
+  notification: null,
 };
 
 // ─── Noms IA ───────────────────────────────────
@@ -100,8 +105,10 @@ const NIVEAUX_IA: NiveauIA[] = ['moyen', 'moyen', 'expert'];
 
 // ─── Store ─────────────────────────────────────
 
-export const useGameStore = create<GameStore>((set, get) => ({
-  ...ETAT_INITIAL,
+export const useGameStore = create<GameStore>()(
+  persist(
+    (set, get) => ({
+      ...ETAT_INITIAL,
 
   // ──────────────────────────────────────────
   //  INITIALISATION
@@ -111,6 +118,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
     const variante = getVariante(varianteId);
     const settings = useSettingsStore.getState();
     const donneur = 0;
+    const sessionGameId = `G-${Math.random().toString(36).substring(2, 9).toUpperCase()}`;
 
     const joueurs: Joueur[] = Array.from({ length: 4 }, (_, i) => ({
       id: i,
@@ -136,11 +144,13 @@ export const useGameStore = create<GameStore>((set, get) => ({
         ordreValeur: settings.ordreValeur,
         direction: settings.directionTri,
       } : {});
+      (j as any).mainInitiale = [...mains[i]]; // Sauvegarde pour Firebase
     });
 
     set({
       ...ETAT_INITIAL,
       varianteId,
+      sessionGameId,
       phase: variante.atoutChoisi ? 'encheres' : 'jeu',
       joueurs,
       manche: 1,
@@ -167,6 +177,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
     const variante = getVariante(scenario.varianteId);
     const settings = useSettingsStore.getState();
     const donneur = 0;
+    const sessionGameId = `S-${Math.random().toString(36).substring(2, 9).toUpperCase()}`;
 
     const joueurs: Joueur[] = Array.from({ length: 4 }, (_, i) => ({
       id: i,
@@ -187,6 +198,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
     set({
       ...ETAT_INITIAL,
       varianteId: scenario.varianteId,
+      sessionGameId,
       phase: variante.atoutChoisi ? 'encheres' : 'jeu',
       joueurs,
       manche: 1,
@@ -234,7 +246,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
 
     const nouvelEtat: EtatEnchere = {
       ...state.etatEnchere,
-      meilleureEnchere: contrat as any,
+      meilleureEnchere: contrat,
       passesConsecutifs: 0,
       historique: [
         ...state.etatEnchere.historique,
@@ -251,6 +263,26 @@ export const useGameStore = create<GameStore>((set, get) => ({
 
   passerEnchere() {
     const state = get();
+    const { etatEnchere, joueurs } = state;
+
+    let partenaireRévélé = state.partenaireRévélé;
+    let contratEnCours = state.contratEnCours;
+
+    // Si on passe alors qu'un Trou est annoncé et qu'on a le 4ème As, on "bouche"
+    if (etatEnchere.meilleureEnchere?.id === 'trou' || etatEnchere.meilleureEnchere?.id === 'trou_royal') {
+      const targetAce = etatEnchere.meilleureEnchere.asPartenaire;
+      const aLAs = joueurs[etatEnchere.joueurCourantId].main.some(c =>
+        c.valeur === targetAce?.valeur && c.couleur === targetAce?.couleur
+      );
+
+      if (aLAs) {
+        // Le joueur accepte tacitement (ou via le bouton "Je bouche")
+        partenaireRévélé = true;
+        // On ne fixe pas encore contratEnCours car l'enchère n'est pas techniquement finie
+        // (quelqu'un pourrait dire Solo par dessus), mais on pourra utiliser cette info
+      }
+    }
+
     const nouvelEtat: EtatEnchere = {
       ...state.etatEnchere,
       passesConsecutifs: state.etatEnchere.passesConsecutifs + 1,
@@ -261,7 +293,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
       joueurCourantId: (state.etatEnchere.joueurCourantId + 1) % 4,
     };
 
-    set({ etatEnchere: nouvelEtat });
+    set({ etatEnchere: nouvelEtat, partenaireRévélé });
 
     // On force l'avancement immédiat pour débloquer l'action
     get()._avancerEncheres();
@@ -316,6 +348,28 @@ export const useGameStore = create<GameStore>((set, get) => ({
           scores: nouveauxScores,
           historiqueManches: [...state.historiqueManches, scoreManche],
         });
+
+        // Sauvegarde Firebase
+        const user = auth.currentUser;
+        if (user && !state.estScenario) {
+          saveGame(user.uid, {
+            sessionGameId: state.sessionGameId,
+            varianteId: state.varianteId,
+            manche: state.manche,
+            scores: nouveauxScores,
+            atout: state.atout,
+            contrat: state.contratEnCours,
+            donne: state.joueurs.map(j => ({
+              joueurId: j.id,
+              nom: j.nom,
+              mainInitiale: (j as any).mainInitiale
+            })),
+            plis: nouveauxPlis,
+            resultat: resultat,
+            historiqueEncheres: state.etatEnchere.historique,
+            timestamp: new Date().toISOString()
+          });
+        }
       } else {
         // Prochain pli
         const nouveauPli: Pli = {
@@ -357,6 +411,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
         ordreValeur: settings.ordreValeur,
         direction: settings.directionTri,
       } : {}),
+      mainInitiale: [...mains[i]], // Sauvegarde pour Firebase
     }));
 
     set({
@@ -447,6 +502,13 @@ export const useGameStore = create<GameStore>((set, get) => ({
 
   _poserCarte(carte: Carte, joueurId: number) {
     const state = get();
+
+    // GARDE-FOU : Vérifier si le joueur a déjà posé une carte dans ce pli
+    if (state.pliEnCours.cartesJouees.some(cp => cp.joueurId === joueurId)) {
+      if (__DEV__) console.warn(`Joueur ${joueurId} a tenté de jouer deux fois dans le même pli.`);
+      return;
+    }
+
     const joueur = state.joueurs[joueurId];
     const couleurDemandee = state.pliEnCours.cartesJouees.length === 0
       ? carte.couleur
@@ -517,18 +579,25 @@ export const useGameStore = create<GameStore>((set, get) => ({
 
     if (tousPassé) {
       const { langue } = useSettingsStore.getState();
-      Alert.alert(
-        translations[langue].alerts.biddingOverTitle,
-        translations[langue].alerts.allPassedMessage,
-        [{ text: translations[langue].common.ok, onPress: () => get().avancerManche() }]
-      );
+      set({
+        notification: {
+          title: translations[langue].alerts.biddingOverTitle,
+          message: translations[langue].alerts.allPassedMessage,
+        }
+      });
+
+      // Avancer la manche après 5 secondes et effacer la notification
+      setTimeout(() => {
+        set({ notification: null });
+        get().avancerManche();
+      }, 5000);
       return;
     }
 
     if (enchereTerminee) {
-      const contrat = etatEnchere.meilleureEnchere as ContratJoue | null;
-      if (!contrat) {
-        // Obligation de jouer pour le donneur
+      const contratFinal = etatEnchere.meilleureEnchere;
+      if (!contratFinal) {
+        // Obligation de jouer pour le donneur (Whist de Gand)
         set({ etatEnchere: { ...etatEnchere, joueurCourantId: state.donneur } });
         return;
       }
@@ -536,8 +605,12 @@ export const useGameStore = create<GameStore>((set, get) => ({
       // Phase de transition pour annoncer le contrat final
       set({
         phase: 'annonce_contrat',
-        contratEnCours: contrat,
-        atout: contrat.atout ?? null,
+        contratEnCours: {
+          ...contratFinal,
+          // Si le partenaire s'est révélé durant les enchères (Bouche), on fixe son ID
+          partenaireId: state.partenaireRévélé ? (state.etatEnchere.historique.find(h => h.action === 'passe' && state.joueurs[h.joueurId].main.some(c => c.valeur === contratFinal.asPartenaire?.valeur && c.couleur === contratFinal.asPartenaire?.couleur))?.joueurId) : undefined
+        },
+        atout: contratFinal.atout ?? null,
       });
 
       // Après un délai, on commence le jeu
@@ -607,7 +680,10 @@ export const useGameStore = create<GameStore>((set, get) => ({
 
     get()._poserCarte(carte, state.tourDeJoueur);
   },
-} as any));
+}), {
+  name: 'allwhist-game-state',
+  storage: createJSONStorage(() => AsyncStorage),
+}));
 
 // ─── Fix typo dans avancerManche ───────────────
 // Note: "jey" → "jeu" (corrigé dans le vrai fichier)

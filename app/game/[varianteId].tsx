@@ -15,7 +15,8 @@ import { Hand }        from '../../src/components/Hand';
 import { BidPanel }    from '../../src/components/BidPanel';
 import { ContractAnnouncement } from '../../src/components/ContractAnnouncement';
 import { PliResultat, MancheResultat } from '../../src/components/ScorePanel';
-import { AdBanner } from '../../src/components/Ads';
+import { useInterstitialAd, AdEventType } from 'react-native-google-mobile-ads';
+import { INTERSTITIAL_ID } from '../../src/components/Ads';
 import { Colors, Spacing, FontSize, FontWeight, Radius } from '../../src/constants/theme';
 import { Carte, Couleur } from '../../src/engine/types';
 import { getVariante } from '../../src/variants/index';
@@ -23,27 +24,60 @@ import { getVariante } from '../../src/variants/index';
 export default function GameScreen() {
   const { varianteId } = useLocalSearchParams<{ varianteId: string }>();
 
+  // Publicité interstitielle
+  const { isLoaded, isClosed, load, show } = useInterstitialAd(INTERSTITIAL_ID, {
+    requestNonPersonalizedAdsOnly: true,
+  });
+
+  // États pour gérer l'affichage différé des résultats après la pub
+  const [resultatsPretsAAfficher, setResultatsPretsAAfficher] = React.useState(false);
+  const [prochaineAction, setProchaineAction] = React.useState<'accueil' | 'manche_suivante' | null>(null);
+
+  // Charger la pub au montage
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  // Surveiller le passage en fin de manche pour lancer la pub
   const {
-    phase,
-    joueurs,
-    pliEnCours,
-    plisTermines,
-    atout,
-    contratEnCours,
-    etatEnchere,
-    scores,
-    manche,
-    tourDeJoueur,
-    partenaireRévélé,
-    historiqueManches,
-    estScenario,
-    jouerCarte,
-    placerEnchere,
-    passerEnchere,
-    avancerPli,
-    avancerManche,
-    cartesJouablesHumain,
+    phase, joueurs, pliEnCours, plisTermines, atout,
+    contratEnCours, etatEnchere, scores, manche,
+    tourDeJoueur, partenaireRévélé, historiqueManches,
+    estScenario, notification,
+    jouerCarte, placerEnchere, passerEnchere, avancerPli, avancerManche, cartesJouablesHumain
   } = useGameStore();
+
+  useEffect(() => {
+    if (phase === 'fin_manche' && !resultatsPretsAAfficher) {
+      if (isLoaded) {
+        show();
+      } else {
+        // Si pas chargée, on affiche les résultats direct pour ne pas bloquer
+        setResultatsPretsAAfficher(true);
+      }
+    }
+    // Reset de l'état quand on change de manche
+    if (phase === 'encheres' || phase === 'jeu') {
+      setResultatsPretsAAfficher(false);
+    }
+  }, [phase, isLoaded, show]);
+
+  // Si la pub est fermée, on exécute l'action prévue
+  useEffect(() => {
+    if (isClosed) {
+      if (prochaineAction === 'accueil') {
+        router.replace('/');
+      } else if (prochaineAction === 'manche_suivante') {
+        avancerManche();
+        load();
+        setProchaineAction(null);
+      } else {
+        // Cas normal : on venait juste de finir la manche, on montre les résultats
+        setResultatsPretsAAfficher(true);
+        load(); // Précharger pour la fin de la prochaine manche
+      }
+    }
+  }, [isClosed, prochaineAction, avancerManche, load]);
 
   // Récupère la variante (sécurisé)
   const variante = React.useMemo(() => {
@@ -87,6 +121,14 @@ export default function GameScreen() {
   // Déterminer si la partie est terminée (ex: après 13 manches)
   const partieTerminee = manche >= 13;
 
+  const handleContinuerApresResultats = () => {
+    if (partieTerminee) {
+      router.replace('/');
+    } else {
+      avancerManche();
+    }
+  };
+
   return (
     <SafeAreaView style={styles.safe}>
 
@@ -124,34 +166,13 @@ export default function GameScreen() {
       {/* ── Corps principal ──────────────────── */}
       <View style={styles.corps}>
 
-        {/* Phase : Enchères */}
-        {phase === 'encheres' && (
-          <BidPanel
-            variante={variante}
-            meilleureEnchere={etatEnchere.meilleureEnchere as any}
-            joueurEnCours={joueurs[etatEnchere.joueurCourantId]?.nom ?? ''}
-            onEnchere={handleEnchere}
-            onPasse={passerEnchere}
-            main={joueurs[0]?.main ?? []}
-            modeApprentissage={true}
-          />
-        )}
-
-        {/* Phase : Transition annonce contrat */}
-        {phase === 'annonce_contrat' && contratEnCours && (
-          <ContractAnnouncement
-            contrat={contratEnCours}
-            joueurs={joueurs}
-            atout={atout}
-          />
-        )}
-
-        {/* Phase : Jeu / fin_pli */}
-        {(phase === 'jeu' || phase === 'fin_pli') && (
+        {/* Phase : Enchères ou Jeu */}
+        {(phase === 'encheres' || phase === 'jeu' || phase === 'fin_pli' || phase === 'annonce_contrat') && (
           <View style={styles.jeuZone}>
 
-            {/* Table */}
+            {/* Table (Visible pour toutes les phases actives) */}
             <GameTable
+              varianteId={varianteId!}
               joueurs={joueurs}
               pliEnCours={pliEnCours}
               atout={atout}
@@ -160,7 +181,43 @@ export default function GameScreen() {
               plisTermines={plisTermines}
               partenaireRévélé={partenaireRévélé}
               scores={scores}
-            />
+              isBidding={phase === 'encheres'}
+              centerContent={
+                (phase === 'encheres' && !notification) ? (
+                  <BidPanel
+                    variante={variante}
+                    meilleureEnchere={etatEnchere.meilleureEnchere as any}
+                    joueurEnCours={joueurs[etatEnchere.joueurCourantId]?.nom ?? ''}
+                    onEnchere={handleEnchere}
+                    onPasse={passerEnchere}
+                    main={joueurs[0]?.main ?? []}
+                    modeApprentissage={true}
+                  />
+                ) : null
+              }
+            >
+              <Hand
+                cartes={joueurs[0]?.main ?? []}
+                cartesJouables={phase === 'jeu' ? cartesJouablesHumain() : []}
+                onJouerCarte={handleJouerCarte}
+                phase={
+                  phase === 'encheres' ? 'encheres' :
+                  (tourDeJoueur === 0 && phase === 'jeu' ? 'jeu' : 'attente')
+                }
+                cartesVisibles={contratEnCours?.cartesVisibles}
+              />
+            </GameTable>
+
+            {/* Transition annonce contrat overlay */}
+            {phase === 'annonce_contrat' && contratEnCours && (
+              <View style={StyleSheet.absoluteFill}>
+                <ContractAnnouncement
+                  contrat={contratEnCours}
+                  joueurs={joueurs}
+                  atout={atout}
+                />
+              </View>
+            )}
 
             {/* Résultat fin de pli */}
             {phase === 'fin_pli' && pliEnCours.gagnantId !== undefined && (
@@ -174,7 +231,7 @@ export default function GameScreen() {
             )}
 
             {/* Contrat info overlay (misère ouverte) */}
-            {contratEnCours?.cartesVisibles && (
+            {contratEnCours?.cartesVisibles && phase === 'jeu' && (
               <View style={styles.misereOuverte}>
                 <Text style={styles.misereOuverteTexte}>
                   Misère ouverte — cartes visibles
@@ -185,35 +242,28 @@ export default function GameScreen() {
         )}
 
         {/* Phase : Fin de manche */}
-        {phase === 'fin_manche' && dernierScoreManche && (
+        {phase === 'fin_manche' && dernierScoreManche && resultatsPretsAAfficher && (
           <MancheResultat
             scoreManche={dernierScoreManche}
             scoresTotal={scores}
             joueurs={joueurs}
             manche={manche}
-            onMancheSuivante={partieTerminee ? () => router.replace('/') : avancerManche}
+            onMancheSuivante={handleContinuerApresResultats}
             partieTerminee={partieTerminee}
           />
         )}
 
-      </View>
+        {/* Notification temporaire (ex: redistribution) */}
+        {notification && (
+          <View style={styles.notificationOverlay}>
+            <View style={styles.notificationContent}>
+              <Text style={styles.notificationTitre}>{notification.title}</Text>
+              <Text style={styles.notificationMessage}>{notification.message}</Text>
+            </View>
+          </View>
+        )}
 
-      {/* Main du joueur humain (Toujours visible pendant le jeu/enchères) */}
-      {(phase === 'encheres' || phase === 'jeu' || phase === 'fin_pli' || phase === 'annonce_contrat') && (
-        <View style={styles.mainConteneurFixe}>
-          <Hand
-            cartes={joueurs[0]?.main ?? []}
-            cartesJouables={phase === 'jeu' ? cartesJouablesHumain() : []}
-            onJouerCarte={handleJouerCarte}
-            phase={
-              phase === 'encheres' ? 'encheres' :
-              (tourDeJoueur === 0 && phase === 'jeu' ? 'jeu' : 'attente')
-            }
-            cartesVisibles={contratEnCours?.cartesVisibles}
-          />
-          <AdBanner marginTop={Spacing.sm} />
-        </View>
-      )}
+      </View>
 
     </SafeAreaView>
   );
@@ -353,5 +403,41 @@ const styles = StyleSheet.create({
     fontSize: FontSize.md,
     color: Colors.primary,
     fontWeight: FontWeight.medium,
+  },
+
+  // Notification overlay
+  notificationOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 1000,
+  },
+  notificationContent: {
+    backgroundColor: Colors.bgSurface,
+    borderRadius: Radius.lg,
+    padding: Spacing.xl,
+    width: '80%',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: Colors.border,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 10,
+  },
+  notificationTitre: {
+    fontSize: FontSize.lg,
+    fontWeight: FontWeight.bold,
+    color: Colors.textPrimary,
+    marginBottom: Spacing.sm,
+    textAlign: 'center',
+  },
+  notificationMessage: {
+    fontSize: FontSize.md,
+    color: Colors.textSecondary,
+    textAlign: 'center',
+    lineHeight: 20,
   },
 });
