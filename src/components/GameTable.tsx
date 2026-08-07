@@ -1,592 +1,261 @@
 // ─────────────────────────────────────────────
-//  COMPOSANT — Table de jeu
+//  COMPOSANT — Table de jeu (Version avec Animation Distribution)
 // ─────────────────────────────────────────────
 
 import React, { useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, Animated, Dimensions } from 'react-native';
 import { Carte, Couleur, Pli, ContratJoue, Joueur, CartePosee } from '../engine/types';
-import { CardFace, CardBack, HandBack } from './Card';
+import { CardFace, HandBack } from './Card';
 import { SYMBOLE } from '../engine/deck';
-import {
-  Colors, Spacing, FontSize, FontWeight,
-  Radius, Shadows, CardSize,
-} from '../constants/theme';
+import { Colors, Shadows } from '../constants/theme';
+import { normalize } from '../utils/normalize';
 import { useTranslation } from '../i18n';
-
 import { getVariante } from '../variants/index';
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
+import { useGameStore } from '../store/gameStore';
+import { DistributionAnimation } from './DistributionAnimation';
 
-// ─── Props ─────────────────────────────────────
+const { width: SW } = Dimensions.get('window');
 
-interface GameTableProps {
-  varianteId: string;
-  joueurs: Joueur[];
-  pliEnCours: Pli;
-  atout: Couleur | null;
-  contrat: ContratJoue | null;
-  tourDeJoueur: number;
-  plisTermines: Pli[];
-  partenaireRévélé: boolean;
-  scores: number[];
-  children?: React.ReactNode;
-  centerContent?: React.ReactNode;
-  isBidding?: boolean;
-}
-
-// ─── Composant Principal ───────────────────────
-
-export const GameTable: React.FC<GameTableProps> = ({
-  varianteId,
-  joueurs,
-  pliEnCours,
-  atout,
-  contrat,
-  tourDeJoueur,
-  plisTermines,
-  partenaireRévélé,
-  children,
-  centerContent,
-  isBidding = false,
+export const GameTable: React.FC<any> = ({
+  phase, varianteId, joueurs, pliEnCours, atout, contrat, tourDeJoueur, plisTermines, partenaireRévélé, children, centerContent, isBidding = false,
 }) => {
-  const getPlisGagnes = (joueurId: number) => {
-    return plisTermines.filter(p => p.gagnantId === joueurId).length;
+  const [cardsReceived, setCardsReceived] = React.useState<number[]>([0, 0, 0, 0]);
+
+  // Reset counts when distribution starts
+  React.useEffect(() => {
+    if (phase === 'distribution') {
+      setCardsReceived([0, 0, 0, 0]);
+    }
+  }, [phase]);
+
+  const handleCardLanded = (playerId: number) => {
+    setCardsReceived(prev => {
+      const next = [...prev];
+      next[playerId]++;
+      return next;
+    });
   };
 
+  const getPlis = (id: number) => plisTermines.filter((p: Pli) => p.gagnantId === id).length;
   const currentVariante = getVariante(varianteId);
 
-  // Déterminer l'équipe de chaque joueur
-  const getEquipe = (id: number): 'A' | 'B' | undefined => {
-    // 1. Cas des variantes à équipes fixes (ex: Whist classique)
-    if (currentVariante?.equipeFixe) {
-      return (id % 2 === 0) ? 'A' : 'B';
-    }
-
+  const getEq = (id: number) => {
+    if (currentVariante?.equipeFixe) return (id % 2 === 0) ? 'A' : 'B';
     if (!contrat) return undefined;
-
     const estAnnonceur = id === contrat.joueurId;
-
-    // Cas Solo / Abondance / Misère (Seul contre tous)
-    if (contrat.seul) {
-      if (estAnnonceur) return 'A';
-      return 'B';
-    }
-
-    // Cas avec partenaire secret (Demande / Trou)
+    if (contrat.seul) return estAnnonceur ? 'A' : 'B';
     if (estAnnonceur) return 'A';
-
-    if (partenaireRévélé) {
-      const estPartenaire = id === contrat.partenaireId;
-      return estPartenaire ? 'A' : 'B';
-    }
-
+    if (partenaireRévélé) return (id === contrat.partenaireId) ? 'A' : 'B';
     return undefined;
   };
 
-  const nbPlisEquipe = contrat ? (
-    contrat.seul
-      ? getPlisGagnes(contrat.joueurId)
-      : (getPlisGagnes(contrat.joueurId) + (contrat.partenaireId !== undefined ? getPlisGagnes(contrat.partenaireId) : 0))
+  const nbPlisEq = contrat ? (
+    contrat.seul ? getPlis(contrat.joueurId) : (getPlis(contrat.joueurId) + (contrat.partenaireId !== undefined ? getPlis(contrat.partenaireId) : 0))
   ) : 0;
 
+  const donneurId = useGameStore.getState().donneur;
+
   return (
-    <View style={[styles.table, children && styles.tableWithHand]}>
-      {/* ── Badges info (Toujours visibles ou masqués si enchères ?) ── */}
+    <View style={styles.container}>
+      {/* ── Badges fixes en haut ── */}
       {!isBidding && (
-        <View style={styles.badgesRow}>
-          {atout && (
-            <View style={styles.badge}>
-              <Text style={styles.badgeTexte}>{SYMBOLE[atout]} Atout</Text>
-            </View>
-          )}
-          {contrat && (
-            <View style={[styles.badge, styles.badgeContrat]}>
-              <Text style={styles.badgeTexteBlanc}>
-                {contrat.nom}
-                {contrat.atout ? ` (${SYMBOLE[contrat.atout]})` : ''}
-                : {nbPlisEquipe} / {contrat.plisObjectif}
-              </Text>
-            </View>
-          )}
-          <View style={styles.badge}>
-            <Text style={styles.badgeTexte}>Pli {plisTermines.length + 1}/13</Text>
-          </View>
+        <View style={styles.topBadges}>
+          {atout && <View style={styles.badge}><Text style={styles.bTxt}>{SYMBOLE[atout]} Atout</Text></View>}
+          {contrat && <View style={[styles.badge, styles.bContrat]}><Text style={styles.bTxtW}>{contrat.nom}: {nbPlisEq}/{contrat.plisObjectif}</Text></View>}
+          <View style={styles.badge}><Text style={styles.bTxt}>Pli {plisTermines.length + 1}/13</Text></View>
         </View>
       )}
 
-      {isBidding ? (
-        /* ── VUE ENCHÈRES : Panneau complet occupant tout le haut ── */
-        <View style={styles.biddingContent}>
-          {centerContent}
-        </View>
-      ) : (
-        /* ── VUE JEU : Disposition classique ── */
-        <>
-          {/* Joueur Nord */}
-          <PlayerSlot
-            joueur={joueurs[2]}
-            position="nord"
-            estSonTour={tourDeJoueur === 2}
-            plisManche={getPlisGagnes(2)}
-            estPartenaire={partenaireRévélé && contrat?.partenaireId === 2}
-            estAnnonceur={contrat?.joueurId === 2}
-            equipe={getEquipe(2)}
-            rotationCards="180deg"
-          />
-
-          <View style={styles.milieu}>
-            <PlayerSlot
-              joueur={joueurs[1]}
-              position="ouest"
-              estSonTour={tourDeJoueur === 1}
-              plisManche={getPlisGagnes(1)}
-              estPartenaire={partenaireRévélé && contrat?.partenaireId === 1}
-              estAnnonceur={contrat?.joueurId === 1}
-              equipe={getEquipe(1)}
-              orientation="vertical"
-              rotationCards="-90deg"
-            />
-            <View style={styles.zonePliPlaceholder}>
-              {centerContent}
+      <View style={styles.arena}>
+        {isBidding ? (
+          <View style={styles.biddingContainer}>
+            {centerContent}
+          </View>
+        ) : (
+          <>
+            <View style={styles.posNord}>
+              <Player
+                j={joueurs[2]}
+                active={tourDeJoueur === 2}
+                plis={getPlis(2)}
+                eq={getEq(2)}
+                ann={contrat?.joueurId === 2}
+                part={partenaireRévélé && contrat?.partenaireId === 2}
+                isDealer={joueurs[2].id === donneurId}
+                phase={phase}
+                cardsCount={phase === 'distribution' ? cardsReceived[2] : undefined}
+              />
             </View>
-            <PlayerSlot
-              joueur={joueurs[3]}
-              position="est"
-              estSonTour={tourDeJoueur === 3}
-              plisManche={getPlisGagnes(3)}
-              estPartenaire={partenaireRévélé && contrat?.partenaireId === 3}
-              estAnnonceur={contrat?.joueurId === 3}
-              equipe={getEquipe(3)}
-              orientation="vertical"
-              rotationCards="90deg"
-            />
-          </View>
-        </>
-      )}
 
-      {/* Joueur Sud + Main (Toujours présent) */}
-      <View style={styles.sudSection}>
-        <PlayerSlot
-          joueur={joueurs[0]}
-          position="sud"
-          estSonTour={tourDeJoueur === 0}
-          plisManche={getPlisGagnes(0)}
-          estPartenaire={partenaireRévélé && contrat?.partenaireId === 0}
-          estAnnonceur={contrat?.joueurId === 0}
-          estHumain
-          equipe={getEquipe(0)}
-          objectif={contrat?.plisObjectif}
-        />
-        {children && (
-          <View style={styles.handWrapperInside}>
-            {children}
-          </View>
+            <View style={styles.middleRow}>
+              <Player
+                j={joueurs[1]}
+                active={tourDeJoueur === 1}
+                plis={getPlis(1)}
+                eq={getEq(1)}
+                ann={contrat?.joueurId === 1}
+                part={partenaireRévélé && contrat?.partenaireId === 1}
+                orient="vertical"
+                isDealer={joueurs[1].id === donneurId}
+                phase={phase}
+                cardsCount={phase === 'distribution' ? cardsReceived[1] : undefined}
+              />
+              <View style={styles.pliZone}>{centerContent}</View>
+              <Player
+                j={joueurs[3]}
+                active={tourDeJoueur === 3}
+                plis={getPlis(3)}
+                eq={getEq(3)}
+                ann={contrat?.joueurId === 3}
+                part={partenaireRévélé && contrat?.partenaireId === 3}
+                orient="vertical"
+                isDealer={joueurs[3].id === donneurId}
+                phase={phase}
+                cardsCount={phase === 'distribution' ? cardsReceived[3] : undefined}
+              />
+            </View>
+          </>
         )}
+
+        <View style={styles.sudArea}>
+          {!isBidding && (
+            <Player
+              j={joueurs[0]}
+              active={tourDeJoueur === 0}
+              plis={getPlis(0)}
+              eq={getEq(0)}
+              ann={contrat?.joueurId === 0}
+              hum
+              obj={contrat?.plisObjectif}
+              isDealer={joueurs[0].id === donneurId}
+              phase={phase}
+              cardsCount={phase === 'distribution' ? cardsReceived[0] : undefined}
+            />
+          )}
+          <View style={styles.handContainer}>
+            {phase === 'distribution'
+              ? (React.isValidElement(children) ? React.cloneElement(children as any, { maxVisible: cardsReceived[0] }) : null)
+              : children
+            }
+          </View>
+        </View>
       </View>
 
-      {/* ZONE DE PLI (Rendered LAST to be on top of avatars) */}
-      <View style={[styles.zonePliAbsolute, { zIndex: 1000 }]} pointerEvents="none">
-        <TableCards
-          cartesJouees={pliEnCours.cartesJouees}
-          gagnantId={pliEnCours.gagnantId}
-          pliNum={pliEnCours.numero}
-        />
-      </View>
+      {/* Cartes sur la table (Overlay) */}
+      {!isBidding && phase !== 'distribution' && (
+        <View style={styles.overlay} pointerEvents="none">
+          {pliEnCours.cartesJouees.map((cp: CartePosee, i: number) => (
+            <PlayedCard key={i} cp={cp} winner={pliEnCours.gagnantId} />
+          ))}
+        </View>
+      )}
+
+      {/* Animation de distribution */}
+      {phase === 'distribution' && (
+        <DistributionAnimation onCardLanded={handleCardLanded} />
+      )}
     </View>
   );
 };
 
-// ──────────────────────────────────────────────
-//  COMPOSANT — TableCards (Overlay des cartes jouées)
-// ──────────────────────────────────────────────
+const PlayedCard = ({ cp, winner }: { cp: CartePosee, winner?: number }) => {
+  const target = [{ x: 0, y: 60 }, { x: -75, y: 0 }, { x: 0, y: -60 }, { x: 75, y: 0 }][cp.joueurId];
+  const start = [{ x: 0, y: 200 }, { x: -150, y: 0 }, { x: 0, y: -200 }, { x: 150, y: 0 }][cp.joueurId];
+  const anim = useRef(new Animated.ValueXY(start)).current;
+  const fade = useRef(new Animated.Value(0)).current;
 
-interface TableCardsProps {
-  cartesJouees: CartePosee[];
-  gagnantId?: number;
-}
-
-const TableCards: React.FC<TableCardsProps & { pliNum: number }> = ({ cartesJouees, gagnantId, pliNum }) => {
-  return (
-    <View style={styles.cardsOverlay}>
-      {cartesJouees.map((cp, index) => (
-        <AnimatedPlayedCard
-          key={`${pliNum}_${cp.carte.id}_${index}`} // Clé plus unique pour forcer le remount
-          cartePosee={cp}
-          playOrder={index}
-          isTrickFinished={gagnantId !== undefined}
-          gagnantId={gagnantId}
-        />
-      ))}
-    </View>
-  );
-};
-
-// ──────────────────────────────────────────────
-//  COMPOSANT — AnimatedPlayedCard
-// ──────────────────────────────────────────────
-
-interface AnimatedPlayedCardProps {
-  cartePosee: CartePosee;
-  playOrder: number;
-  isTrickFinished: boolean;
-  gagnantId?: number;
-}
-
-const AnimatedPlayedCard: React.FC<AnimatedPlayedCardProps> = ({
-  cartePosee, playOrder, isTrickFinished, gagnantId
-}) => {
-  const { joueurId, carte } = cartePosee;
-
-  // Points de départ (venant des joueurs) pour éviter le spawn au centre
-  const START_POS: Record<number, { x: number, y: number }> = {
-    0: { x: 0,   y: 250 },
-    1: { x: -200, y: 0   },
-    2: { x: 0,   y: -250 },
-    3: { x: 200,  y: 0   },
-  };
-
-  const POS_MAP: Record<number, { x: number, y: number }> = {
-    0: { x: 0,   y: 70  }, // Sud (Remonté pour visibilité totale)
-    1: { x: -80, y: 0   },
-    2: { x: 0,   y: -70 },
-    3: { x: 80,  y: 0   },
-  };
-
-  const startPos = START_POS[joueurId] || { x: 0, y: 0 };
-  const targetPos = POS_MAP[joueurId] || { x: 0, y: 0 };
-
-  const fadeAnim = useRef(new Animated.Value(0)).current;
-  const scaleAnim = useRef(new Animated.Value(1)).current;
-  const moveAnim = useRef(new Animated.ValueXY(startPos)).current;
-  const flipAnim = useRef(new Animated.Value(0)).current;
-
-  const rotation = '0deg'; // Toutes les cartes à 0° comme demandé
-
-  // Animation d'entrée
   useEffect(() => {
-    // Si c'est le joueur humain (0), la main a déjà fait l'animation de mouvement
-    // On fait apparaître la carte directement à sa cible pour un effet "seamless"
-    if (joueurId === 0) {
-      moveAnim.setValue(targetPos);
-      fadeAnim.setValue(0);
-      Animated.timing(fadeAnim, { toValue: 1, duration: 150, useNativeDriver: true }).start();
-    } else {
-      // Pour les IA, on garde l'animation de jet depuis leur avatar
-      moveAnim.setValue(startPos);
-      fadeAnim.setValue(0);
-      scaleAnim.setValue(1);
+    Animated.parallel([
+      Animated.timing(fade, { toValue: 1, duration: 200, useNativeDriver: true }),
+      Animated.spring(anim, { toValue: target, friction: 8, useNativeDriver: true }),
+    ]).start();
+  }, []);
 
-      Animated.parallel([
-        Animated.timing(fadeAnim, { toValue: 1, duration: 200, useNativeDriver: true }),
-        Animated.spring(moveAnim, {
-          toValue: targetPos,
-          friction: 8,
-          tension: 40,
-          useNativeDriver: true
-        }),
-      ]).start();
-    }
-  }, [joueurId]);
-
-  // Animation de fin de pli
   useEffect(() => {
-    if (isTrickFinished && gagnantId !== undefined) {
-      const winnerPos = POS_MAP[gagnantId] || { x: 0, y: 0 };
-
+    if (winner !== undefined) {
       Animated.sequence([
-        Animated.delay(1000),
+        Animated.delay(1200),
         Animated.parallel([
-          Animated.timing(moveAnim, {
-            toValue: winnerPos,
-            duration: 600,
-            useNativeDriver: true,
-          }),
-          Animated.timing(scaleAnim, {
-            toValue: 1,
-            duration: 600,
-            useNativeDriver: true,
-          }),
-        ]),
-        Animated.timing(flipAnim, {
-          toValue: 1,
-          duration: 400,
-          useNativeDriver: true,
-        }),
-        Animated.timing(fadeAnim, {
-          toValue: 0,
-          duration: 200,
-          useNativeDriver: true,
-        })
+          Animated.timing(anim, { toValue: [{ x: 0, y: 60 }, { x: -75, y: 0 }, { x: 0, y: -60 }, { x: 75, y: 0 }][winner], duration: 400, useNativeDriver: true }),
+          Animated.timing(fade, { toValue: 0, duration: 400, useNativeDriver: true }),
+        ])
       ]).start();
     }
-  }, [isTrickFinished, gagnantId]);
-
-  const frontRotation = flipAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: ['0deg', '180deg'],
-  });
-  const backRotation = flipAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: ['180deg', '360deg'],
-  });
+  }, [winner]);
 
   return (
-    <Animated.View style={[
-      styles.animatedCardWrapper,
-      {
-        zIndex: playOrder + 1,
-        opacity: fadeAnim,
-        transform: [
-          { translateX: moveAnim.x },
-          { translateY: moveAnim.y },
-          { rotate: rotation },
-          { scale: scaleAnim },
-        ]
-      }
-    ]}>
-      {/* Recto */}
-      <Animated.View style={{ backfaceVisibility: 'hidden', transform: [{ rotateY: frontRotation }] }}>
-        <CardFace carte={carte} taille="table" />
-      </Animated.View>
-
-      {/* Verso (apparaît à la fin du trajet) */}
-      <Animated.View style={[StyleSheet.absoluteFill, { backfaceVisibility: 'hidden', transform: [{ rotateY: backRotation }] }]}>
-        <CardBack style={{ width: CardSize.table.width, height: CardSize.table.height }} />
-      </Animated.View>
+    <Animated.View style={[styles.pCard, { opacity: fade, transform: [{ translateX: anim.x }, { translateY: anim.y }] }]}>
+      <CardFace carte={cp.carte} taille="table" />
     </Animated.View>
   );
 };
 
-// ──────────────────────────────────────────────
-//  COMPOSANT — Slot Joueur (Avatar + Info)
-// ──────────────────────────────────────────────
-
-interface PlayerSlotProps {
-  joueur: Joueur;
-  position: 'nord' | 'sud' | 'est' | 'ouest';
-  estSonTour: boolean;
-  plisManche: number;
-  estPartenaire: boolean;
-  estAnnonceur: boolean;
-  estHumain?: boolean;
-  equipe?: 'A' | 'B';
-  orientation?: 'horizontal' | 'vertical';
-  rotationCards?: string;
-  objectif?: number;
-  thinking?: boolean;
-}
-
-const PlayerSlot: React.FC<PlayerSlotProps> = ({
-  joueur, position, estSonTour, plisManche, estPartenaire, estAnnonceur, estHumain, equipe, orientation = 'horizontal', rotationCards, objectif, thinking
-}) => {
+const Player = ({ j, active, plis, eq, ann, part, orient = 'horizontal', hum, obj, isDealer, phase, cardsCount }: any) => {
   const { t } = useTranslation();
-  const isV = orientation === 'vertical';
-  const teamColor = equipe === 'A' ? Colors.primary : Colors.error;
-  const teamLabel = equipe ? `ÉQUIPE ${equipe}` : '';
-
-  // Animation pour le tour de joueur
-  const pulseAnim = useRef(new Animated.Value(1)).current;
-
-  useEffect(() => {
-    if (estSonTour) {
-      Animated.loop(
-        Animated.sequence([
-          Animated.timing(pulseAnim, {
-            toValue: 1.1,
-            duration: 800,
-            useNativeDriver: true,
-          }),
-          Animated.timing(pulseAnim, {
-            toValue: 1,
-            duration: 800,
-            useNativeDriver: true,
-          }),
-        ])
-      ).start();
-    } else {
-      pulseAnim.setValue(1);
-    }
-  }, [estSonTour]);
+  const color = eq === 'A' ? Colors.primary : '#E24B4A';
+  const nbCartes = cardsCount !== undefined ? cardsCount : j.main.length;
 
   return (
-    <Animated.View style={[
-      styles.playerSlot,
-      styles[`slot_${position}`],
-      estSonTour && styles.slotActif,
-      isV && { flexDirection: 'row' },
-      equipe && {
-        borderColor: teamColor,
-        borderWidth: 2,
-        borderRadius: Radius.lg,
-        backgroundColor: equipe === 'A' ? 'rgba(29, 158, 117, 0.05)' : 'rgba(226, 75, 74, 0.05)'
-      },
-      {
-        transform: [{ scale: pulseAnim }]
-      }
-    ]}>
-      {equipe && (
-        <View style={[
-          styles.teamBadge,
-          { backgroundColor: teamColor },
-          position === 'est' ? { left: -10, top: -10 } : { left: 5, top: -10 }
-        ]}>
-          <Text style={styles.teamBadgeText}>{teamLabel}</Text>
+    <View style={[styles.pSlot, active && styles.pActive, eq && { borderColor: color, borderWidth: 2 }]}>
+      {isDealer && <View style={styles.dealerBadge}><Text style={styles.dealerText}>D</Text></View>}
+      {!hum && nbCartes > 0 && <HandBack nbCartes={nbCartes} orientation={orient} />}
+      <View style={styles.pInfo}>
+        <View style={styles.pRow}>
+          <Text style={[styles.pName, active && { color: Colors.primary }]}>{j.nom}{hum ? ' (Vous)' : ''}</Text>
+          {(ann || part) && <Text style={{ fontSize: 12 }}>{ann ? '🎯' : '🤝'}</Text>}
         </View>
-      )}
-
-      {!estHumain && (
-        <HandBack nbCartes={joueur.main.length} orientation={orientation} rotationCards={rotationCards} />
-      )}
-
-      <View style={[styles.playerInfo, !isV ? styles.playerInfoH : styles.playerInfoV]}>
-        {estSonTour && <View style={styles.tourIndicateur} />}
-        <View style={styles.nameWithBadge}>
-          <Text style={[styles.playerNom, (estPartenaire || estAnnonceur) && styles.playerNomPartenaire, estSonTour && { color: Colors.primary }]}>
-            {joueur.nom}{estHumain ? ' (Vous)' : ''}
-          </Text>
-          {(estAnnonceur || estPartenaire) && (
-            <View style={styles.roleBadge}><Text style={styles.roleBadgeText}>{estAnnonceur ? '🎯' : '🤝'}</Text></View>
-          )}
-        </View>
-        <Text style={[styles.playerScore, estHumain && styles.playerScoreHumain]}>
-          {(!estHumain && estSonTour) ? t('common.thinking') : `${plisManche}${objectif ? ` / ${objectif}` : ''} pli${plisManche > 1 ? 's' : ''}`}
+        <Text style={[styles.pScore, hum && styles.pScoreHum]}>
+          {active && !hum ? t('common.thinking') : `${plis}${obj ? `/${obj}` : ''} pli${plis > 1 ? 's' : ''}`}
         </Text>
       </View>
-    </Animated.View>
+    </View>
   );
 };
 
-// ─── Styles ────────────────────────────────────
-
 const styles = StyleSheet.create({
-  table: {
-    backgroundColor: Colors.bgCard,
-    borderRadius: Radius.xl,
-    padding: Spacing.sm,
-    marginHorizontal: Spacing.sm,
-    height: 480, // Hauteur fixe pour stabiliser la table
-    justifyContent: 'space-between',
-  },
-  tableWithHand: {
-    height: 600, // Augmenter la hauteur pour inclure la main
-  },
-  sudSection: {
-    alignItems: 'center',
-    width: '100%',
-  },
-  biddingContent: {
-    flex: 1,
-    width: '100%',
-    paddingTop: Spacing.md,
-  },
-  handWrapperInside: {
-    width: SCREEN_WIDTH - Spacing.lg * 2,
-    marginTop: -20, // Chevaucher légèrement les infos joueur pour gagner de la place
-  },
-  badgesRow: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    gap: Spacing.xs,
+  container: { flex: 1, backgroundColor: '#f4f7f9', borderRadius: 20, margin: 8, overflow: 'hidden' },
+  topBadges: { flexDirection: 'row', justifyContent: 'center', gap: 8, paddingVertical: 10, zIndex: 10 },
+  badge: { backgroundColor: '#fff', borderRadius: 20, paddingHorizontal: 10, paddingVertical: 4, ...Shadows.card, borderWidth: 0.5, borderColor: '#ddd' },
+  bContrat: { backgroundColor: '#146e52' },
+  bTxt: { fontSize: 11, color: '#455a64', fontWeight: 'bold' },
+  bTxtW: { fontSize: 11, color: '#fff', fontWeight: 'bold' },
+  arena: { flex: 1, padding: 10, justifyContent: 'space-between' },
+  posNord: { alignItems: 'center', height: 80 },
+  middleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', flex: 1 },
+  pliZone: { flex: 1 },
+  biddingContainer: { flex: 1, width: '100%', marginBottom: 10 },
+  sudArea: { alignItems: 'center', width: SW },
+  handContainer: { width: SW, height: normalize(150), marginTop: 5 },
+  pSlot: { backgroundColor: 'rgba(255,255,255,0.8)', borderRadius: 10, padding: 6, alignItems: 'center', minWidth: 80, position: 'relative' },
+  pActive: { backgroundColor: '#fff', elevation: 6, shadowOpacity: 0.2 },
+  pEq: { position: 'absolute', top: -10, left: '50%', marginLeft: -10, width: 20, height: 20, borderRadius: 10, justifyContent: 'center', alignItems: 'center' },
+  pEqT: { color: '#fff', fontSize: 10, fontWeight: 'bold' },
+  pInfo: { marginTop: 4, alignItems: 'center' },
+  pRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  pName: { fontSize: 11, fontWeight: 'bold', color: '#78909c' },
+  pScore: { fontSize: 10, color: '#455a64', fontWeight: 'bold' },
+  pScoreHum: { fontSize: 14, color: Colors.primary },
+  overlay: { ...StyleSheet.absoluteFillObject, justifyContent: 'center', alignItems: 'center', zIndex: 50 },
+  pCard: { position: 'absolute', ...Shadows.card },
+  dealerBadge: {
     position: 'absolute',
-    top: Spacing.sm,
-    left: 0,
-    right: 0,
-    zIndex: 200,
-  },
-  badge: {
-    backgroundColor: Colors.bgSurface,
-    borderRadius: Radius.full,
-    paddingHorizontal: Spacing.sm,
-    paddingVertical: 3,
-    borderWidth: 0.5,
-    borderColor: Colors.border,
-    ...Shadows.panel,
-  },
-  badgeContrat: { backgroundColor: Colors.primaryDark, borderColor: Colors.primary },
-  badgeTexte: { fontSize: FontSize.xs, color: Colors.textSecondary, fontWeight: FontWeight.medium },
-  badgeTexteBlanc: { fontSize: FontSize.xs, color: '#ffffff', fontWeight: FontWeight.bold },
-
-  milieu: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    flex: 1,
-    zIndex: 1,
-  },
-  zonePliAbsolute: {
-    ...StyleSheet.absoluteFillObject,
+    top: -12,
+    right: -10,
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: '#378ADD',
+    borderWidth: 1,
+    borderColor: '#fff',
     justifyContent: 'center',
     alignItems: 'center',
-    zIndex: 1000,
-  },
-  zonePliPlaceholder: {
-    flex: 1,
-  },
-  zonePli: {
-    flex: 1,
-    height: '100%',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  cardsOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  animatedCardWrapper: {
-    position: 'absolute',
-    ...Shadows.card,
-  },
-
-  playerSlot: {
-    alignItems: 'center',
-    paddingVertical: Spacing.xs,
-    position: 'relative',
-    minHeight: 90,
-    justifyContent: 'center',
-  },
-  slot_nord: { marginTop: Spacing.xl },
-  slot_sud: { marginBottom: Spacing.sm },
-  slot_est: { width: 80 },
-  slot_ouest: { width: 80 },
-  slotActif: {},
-
-  playerInfo: { alignItems: 'center', marginTop: 5, flexDirection: 'row', gap: 4 },
-  playerInfoH: { flexDirection: 'row', gap: 4 },
-  playerInfoV: { flexDirection: 'column', gap: 2, marginLeft: 8 },
-  tourIndicateur: { width: 8, height: 8, borderRadius: 4, backgroundColor: Colors.primary },
-  playerNom: { fontSize: FontSize.xs, color: Colors.textMuted, fontWeight: FontWeight.medium, textTransform: 'uppercase' },
-  playerNomPartenaire: { color: Colors.primary, fontWeight: FontWeight.bold },
-  nameWithBadge: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  roleBadge: { backgroundColor: Colors.bgSurface, borderRadius: Radius.sm, paddingHorizontal: 2, borderWidth: 0.5, borderColor: Colors.border },
-  roleBadgeText: { fontSize: 12 },
-  teamBadge: {
-    position: 'absolute',
-    paddingHorizontal: 6,
-    paddingVertical: 1,
-    borderRadius: Radius.sm,
-    zIndex: 10,
-    elevation: 3,
-  },
-  teamBadgeText: {
-    color: '#fff',
-    fontSize: 8,
-    fontWeight: FontWeight.bold,
-  },
-  playerScoreHumain: {
-    backgroundColor: Colors.primary,
-    paddingHorizontal: Spacing.md,
-    paddingVertical: 4,
-    borderRadius: Radius.full,
-    color: '#fff',
-    fontSize: FontSize.md,
-    fontWeight: FontWeight.black,
-    marginTop: 4,
+    zIndex: 20,
     elevation: 4,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 3,
   },
-  playerScore: { fontSize: FontSize.xs, color: Colors.textSecondary, fontWeight: FontWeight.semibold },
+  dealerText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: 'bold',
+  },
 });

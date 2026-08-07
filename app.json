@@ -2,7 +2,7 @@
   "expo": {
     "name": "allWhist",
     "slug": "allwhist",
-    "version": "1.0.2",
+    "version": "1.0.4",
     "orientation": "default",
     "scheme": "allwhist",
     "userInterfaceStyle": "dark",
@@ -26,7 +26,7 @@
         "backgroundColor": "#ffffff"
       },
       "package": "com.allwhist.app",
-      "versionCode": 3,
+      "versionCode": 5,
       "softwareKeyboardLayoutMode": "adjustResize",
       "statusBar": {
         "hidden": false,

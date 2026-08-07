@@ -2,10 +2,10 @@
 //  app/game/[varianteId].tsx — Écran de jeu
 // ─────────────────────────────────────────────
 
-import React, { useCallback, useEffect } from 'react';
+import React, { useCallback, useEffect, useRef } from 'react';
 import {
   View, StyleSheet,
-  TouchableOpacity, Text, Alert,
+  TouchableOpacity, Text, Alert, Animated, Easing
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
@@ -15,17 +15,72 @@ import { Hand }        from '../../src/components/Hand';
 import { BidPanel }    from '../../src/components/BidPanel';
 import { ContractAnnouncement } from '../../src/components/ContractAnnouncement';
 import { PliResultat, MancheResultat } from '../../src/components/ScorePanel';
-import { useInterstitialAd, AdEventType } from 'react-native-google-mobile-ads';
-import { INTERSTITIAL_ID } from '../../src/components/Ads';
+import { useInterstitialAd, useRewardedInterstitialAd, AdEventType } from 'react-native-google-mobile-ads';
+import { INTERSTITIAL_ID, END_GAME_INTERSTITIAL_ID } from '../../src/components/Ads';
 import { Colors, Spacing, FontSize, FontWeight, Radius } from '../../src/constants/theme';
 import { Carte, Couleur } from '../../src/engine/types';
 import { getVariante } from '../../src/variants/index';
 
+// Petit composant de barre de progression pour le minuteur
+const AnimatedTimer = ({ duration }: { duration: number }) => {
+  const widthAnim = useRef(new Animated.Value(100)).current;
+
+  useEffect(() => {
+    widthAnim.setValue(100);
+    Animated.timing(widthAnim, {
+      toValue: 0,
+      duration: duration,
+      easing: Easing.linear,
+      useNativeDriver: false,
+    }).start();
+  }, [duration]);
+
+  return (
+    <View style={timerStyles.track}>
+      <Animated.View
+        style={[
+          timerStyles.bar,
+          { width: widthAnim.interpolate({
+              inputRange: [0, 100],
+              outputRange: ['0%', '100%']
+            })
+          }
+        ]}
+      />
+    </View>
+  );
+};
+
+const timerStyles = StyleSheet.create({
+  track: {
+    height: 4,
+    width: '100%',
+    backgroundColor: 'rgba(0,0,0,0.05)',
+    borderRadius: 2,
+    marginTop: Spacing.lg,
+    overflow: 'hidden',
+  },
+  bar: {
+    height: '100%',
+    backgroundColor: Colors.primary,
+  }
+});
+
 export default function GameScreen() {
   const { varianteId } = useLocalSearchParams<{ varianteId: string }>();
 
-  // Publicité interstitielle
+  // Publicité interstitielle de fin de manche
   const { isLoaded, isClosed, load, show } = useInterstitialAd(INTERSTITIAL_ID, {
+    requestNonPersonalizedAdsOnly: true,
+  });
+
+  // Publicité interstitielle de fin de partie (Victoire finale)
+  const {
+    isLoaded: isEndGameLoaded,
+    isClosed: isEndGameClosed,
+    load: loadEndGame,
+    show: showEndGame
+  } = useRewardedInterstitialAd(END_GAME_INTERSTITIAL_ID, {
     requestNonPersonalizedAdsOnly: true,
   });
 
@@ -33,10 +88,11 @@ export default function GameScreen() {
   const [resultatsPretsAAfficher, setResultatsPretsAAfficher] = React.useState(false);
   const [prochaineAction, setProchaineAction] = React.useState<'accueil' | 'manche_suivante' | null>(null);
 
-  // Charger la pub au montage
+  // Charger les pubs au montage
   useEffect(() => {
     load();
-  }, [load]);
+    loadEndGame();
+  }, [load, loadEndGame]);
 
   // Surveiller le passage en fin de manche pour lancer la pub
   const {
@@ -44,7 +100,7 @@ export default function GameScreen() {
     contratEnCours, etatEnchere, scores, manche,
     tourDeJoueur, partenaireRévélé, historiqueManches,
     estScenario, notification,
-    jouerCarte, placerEnchere, passerEnchere, avancerPli, avancerManche, cartesJouablesHumain
+    jouerCarte, placerEnchere, passerEnchere, avancerPli, avancerManche, terminerPartie, cartesJouablesHumain
   } = useGameStore();
 
   useEffect(() => {
@@ -64,7 +120,7 @@ export default function GameScreen() {
 
   // Si la pub est fermée, on exécute l'action prévue
   useEffect(() => {
-    if (isClosed) {
+    if (isClosed || isEndGameClosed) {
       if (prochaineAction === 'accueil') {
         router.replace('/');
       } else if (prochaineAction === 'manche_suivante') {
@@ -77,7 +133,7 @@ export default function GameScreen() {
         load(); // Précharger pour la fin de la prochaine manche
       }
     }
-  }, [isClosed, prochaineAction, avancerManche, load]);
+  }, [isClosed, isEndGameClosed, prochaineAction, avancerManche, load]);
 
   // Récupère la variante (sécurisé)
   const variante = React.useMemo(() => {
@@ -86,14 +142,7 @@ export default function GameScreen() {
 
   // Quitter la partie
   const handleQuitter = () => {
-    Alert.alert(
-      'Quitter la partie',
-      'La progression sera perdue.',
-      [
-        { text: 'Annuler', style: 'cancel' },
-        { text: 'Quitter', style: 'destructive', onPress: () => router.replace('/') },
-      ],
-    );
+    router.replace('/');
   };
 
   const handleJouerCarte = useCallback((carte: Carte) => {
@@ -118,12 +167,19 @@ export default function GameScreen() {
     );
   }
 
-  // Déterminer si la partie est terminée (ex: après 13 manches)
-  const partieTerminee = manche >= 13;
+  // Déterminer si la partie est terminée
+  const MAX_MANCHES = __DEV__ ? 3 : 13;
+  const partieTerminee = manche >= MAX_MANCHES;
 
   const handleContinuerApresResultats = () => {
     if (partieTerminee) {
-      router.replace('/');
+      terminerPartie(); // Marquer comme fini dans le store (le bouton "reprendre" disparaîtra)
+      setProchaineAction('accueil');
+      if (isEndGameLoaded) {
+        showEndGame();
+      } else {
+        router.replace('/');
+      }
     } else {
       avancerManche();
     }
@@ -147,7 +203,7 @@ export default function GameScreen() {
             )}
           </View>
           <Text style={styles.topManche}>
-            {estScenario ? "Partie pédagogique" : `Manche ${manche} / 13`}
+            {estScenario ? "Partie pédagogique" : `Manche ${manche} / ${MAX_MANCHES}`}
           </Text>
         </View>
         {/* Scores compacts */}
@@ -166,12 +222,13 @@ export default function GameScreen() {
       {/* ── Corps principal ──────────────────── */}
       <View style={styles.corps}>
 
-        {/* Phase : Enchères ou Jeu */}
-        {(phase === 'encheres' || phase === 'jeu' || phase === 'fin_pli' || phase === 'annonce_contrat') && (
+        {/* Phase : Enchères, Distribution ou Jeu */}
+        {(phase === 'distribution' || phase === 'encheres' || phase === 'jeu' || phase === 'fin_pli' || phase === 'annonce_contrat') && (
           <View style={styles.jeuZone}>
 
             {/* Table (Visible pour toutes les phases actives) */}
             <GameTable
+              phase={phase}
               varianteId={varianteId!}
               joueurs={joueurs}
               pliEnCours={pliEnCours}
@@ -253,12 +310,17 @@ export default function GameScreen() {
           />
         )}
 
-        {/* Notification temporaire (ex: redistribution) */}
+        {/* Notification temporaire avec barre de progression */}
         {notification && (
           <View style={styles.notificationOverlay}>
             <View style={styles.notificationContent}>
               <Text style={styles.notificationTitre}>{notification.title}</Text>
               <Text style={styles.notificationMessage}>{notification.message}</Text>
+
+              {/* Petit minuteur moderne (barre de progression) */}
+              <View style={styles.timerContainer}>
+                <AnimatedTimer duration={5000} />
+              </View>
             </View>
           </View>
         )}
@@ -282,19 +344,20 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.sm,
-    borderBottomWidth: 0.5,
+    paddingVertical: Spacing.md,
+    backgroundColor: Colors.bgSurface,
+    borderBottomWidth: 1,
     borderBottomColor: Colors.border,
-    gap: Spacing.sm,
+    gap: Spacing.md,
   },
   btnQuitter: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: Colors.bgSurface,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: Colors.bgInput,
     justifyContent: 'center',
     alignItems: 'center',
-    borderWidth: 0.5,
+    borderWidth: 1,
     borderColor: Colors.border,
   },
   btnQuitterTexte: {
@@ -322,32 +385,40 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
   },
   topVariante: {
-    fontSize: FontSize.sm,
-    fontWeight: FontWeight.semibold,
+    fontSize: FontSize.md,
+    fontWeight: FontWeight.bold,
     color: Colors.textPrimary,
   },
   topManche: {
     fontSize: FontSize.xs,
     color: Colors.textMuted,
+    fontWeight: FontWeight.medium,
   },
   scoresRow: {
     flexDirection: 'row',
-    gap: Spacing.xs,
+    gap: Spacing.sm,
   },
   scoreBadge: {
     alignItems: 'center',
-    minWidth: 36,
+    minWidth: 40,
+    backgroundColor: Colors.bgInput,
+    paddingHorizontal: 4,
+    paddingVertical: 2,
+    borderRadius: Radius.sm,
+    borderWidth: 0.5,
+    borderColor: Colors.border,
   },
   scoreNom: {
-    fontSize: 9,
+    fontSize: 8,
     color: Colors.textMuted,
     textTransform: 'uppercase',
-    letterSpacing: 0.3,
+    fontWeight: FontWeight.bold,
+    letterSpacing: 0.5,
   },
   scoreVal: {
     fontSize: FontSize.sm,
-    fontWeight: FontWeight.bold,
-    color: Colors.textSecondary,
+    fontWeight: FontWeight.black,
+    color: Colors.textPrimary,
   },
   scoreValHumain: {
     color: Colors.primary,
@@ -439,5 +510,9 @@ const styles = StyleSheet.create({
     color: Colors.textSecondary,
     textAlign: 'center',
     lineHeight: 20,
+  },
+  timerContainer: {
+    width: '100%',
+    marginTop: Spacing.sm,
   },
 });

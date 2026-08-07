@@ -11,6 +11,7 @@ import { router } from 'expo-router';
 import { useGameStore } from '../src/store/gameStore';
 import { useSettingsStore } from '../src/store/settingsStore';
 import { Colors, Spacing, FontSize, FontWeight, Radius } from '../src/constants/theme';
+import { normalize } from '../src/utils/normalize';
 import { useTranslation } from '../src/i18n';
 import { AdBanner } from '../src/components/Ads';
 import { WelcomeOverlay } from '../src/components/WelcomeOverlay';
@@ -47,7 +48,6 @@ const MenuItem: React.FC<MenuItemProps> = ({
   return (
     <Animated.View
       style={{
-        flex: 1, // Permet à l'item de s'étendre verticalement
         opacity: animValue,
         transform: [
           {
@@ -102,6 +102,9 @@ export default function HomeScreen() {
     const checkHydration = () => {
       if (useGameStore.persist.hasHydrated() && useSettingsStore.persist.hasHydrated()) {
         setIsHydrated(true);
+        // Appliquer la récompense quotidienne
+        useSettingsStore.getState().checkDailyReward();
+
         if (!useSettingsStore.getState().hasSeenOnboarding) {
           setShowOnboarding(true);
         }
@@ -260,21 +263,24 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.bg,
   },
   scroll: {
-    flexGrow: 1, // Permet au contenu de s'étendre pour remplir l'écran
+    flexGrow: 1,
     paddingHorizontal: Spacing.lg,
     paddingBottom: Spacing.md,
+    alignItems: 'center',
   },
 
   // Logo
   logoZone: {
     alignItems: 'center',
-    paddingVertical: Spacing.lg,
+    paddingTop: Spacing.xxl,
+    paddingBottom: Spacing.lg,
+    width: '100%',
   },
   logoIcon: {
-    width: 90,
-    height: 90,
+    width: 120,
+    height: 120,
     borderRadius: Radius.xl,
-    marginBottom: Spacing.xs,
+    marginBottom: Spacing.sm,
   },
   logoSym: {
     fontSize: 24,
@@ -296,34 +302,42 @@ const styles = StyleSheet.create({
 
   // Menu
   menu: {
-    flex: 1, // Occupe tout l'espace restant
-    gap: Spacing.xs,
-    justifyContent: 'center',
-    marginBottom: Spacing.md,
+    width: '100%',
+    maxWidth: 500,
+    gap: Spacing.md,
+    justifyContent: 'flex-start',
+    marginBottom: Spacing.xxl,
   },
   menuItem: {
-    flex: 1, // S'étire pour remplir le conteneur menu
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: Colors.bgCard,
     borderRadius: Radius.lg,
-    padding: Spacing.md,
-    borderWidth: 0.5,
-    borderColor: Colors.border,
+    padding: Spacing.lg,
+    borderWidth: 1,
+    borderColor: 'transparent',
     gap: Spacing.md,
-    minHeight: 64, // Sécurité pour petits écrans
+    minHeight: 80,
+    // Ombre légère
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
   },
   menuItemPrimaire: {
     backgroundColor: Colors.primaryDark,
     borderColor: Colors.primary,
+    elevation: 4,
   },
   menuItemResume: {
     borderColor: Colors.info,
-    backgroundColor: '#e3f2fd',
+    backgroundColor: '#ebf5ff',
+    elevation: 3,
   },
   menuIcon: {
-    width: 40,
-    height: 40,
+    width: 48,
+    height: 48,
     borderRadius: Radius.md,
     justifyContent: 'center',
     alignItems: 'center',
@@ -339,17 +353,18 @@ const styles = StyleSheet.create({
   },
   menuTexte: { flex: 1 },
   menuTitre: {
-    fontSize: FontSize.md,
-    fontWeight: FontWeight.semibold,
+    fontSize: FontSize.lg,
+    fontWeight: FontWeight.bold,
     color: Colors.textPrimary,
   },
   menuTitrePrimaire: {
     color: '#fff',
   },
   menuSous: {
-    fontSize: FontSize.xs,
+    fontSize: FontSize.sm,
     color: Colors.textMuted,
-    marginTop: 1,
+    marginTop: 2,
+    lineHeight: 18,
   },
   menuChevron: {
     fontSize: 20,

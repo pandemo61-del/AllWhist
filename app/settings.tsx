@@ -10,6 +10,8 @@ import { Colors, Spacing, FontSize, FontWeight, Radius } from '../src/constants/
 import { Couleur } from '../src/engine/types';
 import { SYMBOLE } from '../src/engine/deck';
 import { useTranslation } from '../src/i18n';
+import { RewardedInterstitialAd, RewardedAdEventType, TestIds } from 'react-native-google-mobile-ads';
+import { REWARDED_ID } from '../src/components/Ads';
 
 export default function SettingsScreen() {
   const { t } = useTranslation();
@@ -19,7 +21,41 @@ export default function SettingsScreen() {
     ordreCouleurs, setOrdreCouleurs,
     autoJeu, setAutoJeu,
     langue, setLangue,
+    vibration, setVibration,
+    son, setSon,
+    animationDonne, setAnimationDonne,
+    coachCredits, addCoachCredits
   } = useSettingsStore();
+
+  const [adLoaded, setAdLoaded] = React.useState(false);
+  const rewarded = React.useMemo(() => RewardedInterstitialAd.createForAdRequest(REWARDED_ID), []);
+
+  React.useEffect(() => {
+    const unsubscribeLoaded = rewarded.addAdEventListener(RewardedAdEventType.LOADED, () => {
+      setAdLoaded(true);
+    });
+    const unsubscribeEarned = rewarded.addAdEventListener(
+      RewardedAdEventType.EARNED_REWARD,
+      reward => {
+        addCoachCredits(2);
+        setAdLoaded(false);
+        rewarded.load(); // Reload for next time
+      }
+    );
+
+    rewarded.load();
+
+    return () => {
+      unsubscribeLoaded();
+      unsubscribeEarned();
+    };
+  }, [rewarded, addCoachCredits]);
+
+  const handleWatchAd = () => {
+    if (adLoaded) {
+      rewarded.show();
+    }
+  };
 
   const { appliquerTriParametres } = useGameStore();
 
@@ -135,6 +171,24 @@ export default function SettingsScreen() {
             </View>
           </View>
 
+          <View style={styles.option}>
+            <Text style={styles.optionLabel}>{t('settings.animationDonne') || 'Anim. de distribution'}</Text>
+            <View style={styles.btnGroup}>
+              <TouchableOpacity
+                style={[styles.btn, animationDonne === true && styles.btnActive]}
+                onPress={() => setAnimationDonne(true)}
+              >
+                <Text style={[styles.btnTexte, animationDonne === true && styles.btnTexteActive]}>{t('common.yes') || 'Oui'}</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.btn, animationDonne === false && styles.btnActive]}
+                onPress={() => setAnimationDonne(false)}
+              >
+                <Text style={[styles.btnTexte, animationDonne === false && styles.btnTexteActive]}>{t('common.no') || 'Non'}</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+
         </View>
 
         <View style={styles.section}>
@@ -175,6 +229,27 @@ export default function SettingsScreen() {
               </TouchableOpacity>
             </View>
           </View>
+        </View>
+
+        <View style={styles.section}>
+          <Text style={styles.sectionTitre}>{t('settings.coachCredits') || 'Avis du coach'}</Text>
+          <View style={styles.option}>
+            <View>
+              <Text style={styles.optionLabel}>{coachCredits} 🪙 disponibles</Text>
+              <Text style={styles.smallAction}>+2 offerts chaque jour</Text>
+            </View>
+            <TouchableOpacity
+              style={[styles.btnAd, !adLoaded && styles.btnDisabled]}
+              onPress={handleWatchAd}
+              disabled={!adLoaded}
+            >
+              <Text style={styles.btnAdTexte}>+2 🪙 ({adLoaded ? 'Pub prête' : 'Chargement...'})</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        <View style={styles.versionSection}>
+          <Text style={styles.versionTexte}>AllWhist v1.0.3 (4)</Text>
         </View>
 
       </ScrollView>
@@ -281,5 +356,29 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderRadius: Radius.sm,
     backgroundColor: Colors.bgSurface,
+  },
+  versionSection: {
+    marginTop: Spacing.xl,
+    alignItems: 'center',
+    paddingBottom: Spacing.xl,
+  },
+  versionTexte: {
+    fontSize: FontSize.xs,
+    color: Colors.textMuted,
+    opacity: 0.6,
+  },
+  btnAd: {
+    backgroundColor: '#faad14',
+    paddingHorizontal: Spacing.md,
+    paddingVertical: 8,
+    borderRadius: Radius.full,
+  },
+  btnAdTexte: {
+    color: '#fff',
+    fontWeight: 'bold',
+    fontSize: 12,
+  },
+  btnDisabled: {
+    opacity: 0.5,
   },
 });

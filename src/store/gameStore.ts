@@ -53,8 +53,8 @@ interface GameStore extends EtatPartie {
   /** Passe au pli suivant (après affichage du résultat). */
   avancerPli: () => void;
 
-  /** Passe à la manche suivante. */
-  avancerManche: () => void;
+  /** Passe à la manche suivante ou redistribue si tout le monde a passé. */
+  avancerManche: (estRedistribution?: boolean) => void;
 
   /** Quitte immédiatement la phase d'annonce de contrat. */
   passerAnnonceContrat: () => void;
@@ -62,8 +62,14 @@ interface GameStore extends EtatPartie {
   /** Réinitialise tout. */
   resetPartie: () => void;
 
+  /** Marque la partie comme terminée (toutes les manches finies). */
+  terminerPartie: () => void;
+
   /** Trie la main du joueur humain selon les préférences actuelles. */
   appliquerTriParametres: () => void;
+
+  /** Termine la phase de distribution et lance les enchères ou le jeu. */
+  finaliserDistribution: () => void;
 
   // ──── Helpers lecture ─────────────────────
 
@@ -117,7 +123,7 @@ export const useGameStore = create<GameStore>()(
   initialiserPartie(varianteId, nomJoueur = 'Vous') {
     const variante = getVariante(varianteId);
     const settings = useSettingsStore.getState();
-    const donneur = 0;
+    const donneur = Math.floor(Math.random() * 4); // Premier donneur aléatoire
     const sessionGameId = `G-${Math.random().toString(36).substring(2, 9).toUpperCase()}`;
 
     const joueurs: Joueur[] = Array.from({ length: 4 }, (_, i) => ({
@@ -147,11 +153,13 @@ export const useGameStore = create<GameStore>()(
       (j as any).mainInitiale = [...mains[i]]; // Sauvegarde pour Firebase
     });
 
+    const phaseInitiale: PhaseJeu = settings.animationDonne ? 'distribution' : (variante.atoutChoisi ? 'encheres' : 'jeu');
+
     set({
       ...ETAT_INITIAL,
       varianteId,
       sessionGameId,
-      phase: variante.atoutChoisi ? 'encheres' : 'jeu',
+      phase: phaseInitiale,
       joueurs,
       manche: 1,
       scores: [0, 0, 0, 0],
@@ -168,7 +176,7 @@ export const useGameStore = create<GameStore>()(
     });
 
     // Lancer l'IA si elle commence (ou autoJeu)
-    if (variante.atoutChoisi && ((donneur + 1) % 4 !== 0 || settings.autoJeu)) {
+    if (phaseInitiale !== 'distribution' && variante.atoutChoisi && ((donneur + 1) % 4 !== 0 || settings.autoJeu)) {
       setTimeout(() => get()._faireProchaineActionIA(), 600);
     }
   },
@@ -195,11 +203,13 @@ export const useGameStore = create<GameStore>()(
 
     const atout = scenario.atoutInitial ?? null;
 
+    const phaseInitiale: PhaseJeu = settings.animationDonne ? 'distribution' : (variante.atoutChoisi ? 'encheres' : 'jeu');
+
     set({
       ...ETAT_INITIAL,
       varianteId: scenario.varianteId,
       sessionGameId,
-      phase: variante.atoutChoisi ? 'encheres' : 'jeu',
+      phase: phaseInitiale,
       joueurs,
       manche: 1,
       scores: [0, 0, 0, 0],
@@ -215,7 +225,7 @@ export const useGameStore = create<GameStore>()(
       estScenario: true,
     });
 
-    if (variante.atoutChoisi && ((donneur + 1) % 4 !== 0 || settings.autoJeu)) {
+    if (phaseInitiale !== 'distribution' && variante.atoutChoisi && ((donneur + 1) % 4 !== 0 || settings.autoJeu)) {
       setTimeout(() => get()._faireProchaineActionIA(), 600);
     }
   },
@@ -321,7 +331,11 @@ export const useGameStore = create<GameStore>()(
 
     // On attend que les animations de ramassage (2s + 1s mouvement) soient finies avant de nettoyer la table
     setTimeout(() => {
-      if (mancheTerminee(nouveauxPlis)) {
+      const contrat = state.contratEnCours!;
+      const estMisere = contrat?.id.startsWith('misere');
+      const miserePerdue = estMisere && gagnant === contrat.joueurId;
+
+      if (mancheTerminee(nouveauxPlis) || miserePerdue) {
         // Analyser toutes les erreurs de la manche
         const toutesErreurs = nouveauxPlis.flatMap(p => analyserPli(p, state.contratEnCours!, state.atout, nouveauxPlis));
 
@@ -391,8 +405,15 @@ export const useGameStore = create<GameStore>()(
     }, 3200); // 2s pause + ~1s animation
   },
 
-  avancerManche() {
+  avancerManche(estRedistribution = false) {
     const state = get();
+    const MAX = __DEV__ ? 3 : 13;
+
+    if (!estRedistribution && state.manche >= MAX) {
+      set({ phase: 'fin_partie' });
+      return;
+    }
+
     const settings = useSettingsStore.getState();
     const nouveauDonneur = (state.donneur + 1) % 4;
     const variante = getVariante(state.varianteId);
@@ -414,10 +435,18 @@ export const useGameStore = create<GameStore>()(
       mainInitiale: [...mains[i]], // Sauvegarde pour Firebase
     }));
 
+    const nextManche = estRedistribution ? state.manche : state.manche + 1;
+    if (!estRedistribution && nextManche > MAX) {
+      set({ phase: 'fin_partie' });
+      return;
+    }
+
+    const phaseSuivante: PhaseJeu = settings.animationDonne ? 'distribution' : (variante.atoutChoisi ? 'encheres' : 'jeu');
+
     set({
-      phase: variante.atoutChoisi ? 'encheres' : 'jeu',
+      phase: phaseSuivante,
       joueurs,
-      manche: state.manche + 1,
+      manche: nextManche,
       pliEnCours: { numero: 0, cartesJouees: [] },
       plisTermines: [],
       atout,
@@ -433,13 +462,17 @@ export const useGameStore = create<GameStore>()(
       },
     });
 
-    if (variante.atoutChoisi && ((nouveauDonneur + 1) % 4 !== 0 || settings.autoJeu)) {
+    if (phaseSuivante !== 'distribution' && variante.atoutChoisi && ((nouveauDonneur + 1) % 4 !== 0 || settings.autoJeu)) {
       setTimeout(() => get()._faireProchaineActionIA(), 600);
     }
   },
 
   resetPartie() {
     set({ ...ETAT_INITIAL });
+  },
+
+  terminerPartie() {
+    set({ phase: 'fin_partie' });
   },
 
   passerAnnonceContrat() {
@@ -455,6 +488,21 @@ export const useGameStore = create<GameStore>()(
     });
     if ((state.donneur + 1) % 4 !== 0 || settings.autoJeu) {
       get()._faireProchaineActionIA();
+    }
+  },
+
+  finaliserDistribution() {
+    const state = get();
+    if (state.phase !== 'distribution') return;
+
+    const variante = getVariante(state.varianteId);
+    const settings = useSettingsStore.getState();
+    const phaseSuivante = variante.atoutChoisi ? 'encheres' : 'jeu';
+
+    set({ phase: phaseSuivante });
+
+    if (phaseSuivante === 'encheres' || (state.tourDeJoueur !== 0 || settings.autoJeu)) {
+      setTimeout(() => get()._faireProchaineActionIA(), 400);
     }
   },
 
@@ -589,13 +637,28 @@ export const useGameStore = create<GameStore>()(
       // Avancer la manche après 5 secondes et effacer la notification
       setTimeout(() => {
         set({ notification: null });
-        get().avancerManche();
+        get().avancerManche(true);
       }, 5000);
       return;
     }
 
     if (enchereTerminee) {
       const contratFinal = etatEnchere.meilleureEnchere;
+
+      // Sécurité Whist de Gand : une Proposition seule ne peut pas lancer le jeu
+      if (contratFinal?.id === 'propose' && !state.etatEnchere.historique.some(h => h.action === 'enchere' && h.contrat?.id === 'emballe')) {
+        // On rend la main au proposant pour qu'il change son fusil d'épaule ou passe
+        const proposantId = state.etatEnchere.historique.find(h => h.contrat?.id === 'propose')?.joueurId ?? state.donneur;
+        set({
+          etatEnchere: {
+            ...state.etatEnchere,
+            joueurCourantId: proposantId,
+            passesConsecutifs: 0 // Reset pour permettre de nouvelles actions
+          }
+        });
+        return;
+      }
+
       if (!contratFinal) {
         // Obligation de jouer pour le donneur (Whist de Gand)
         set({ etatEnchere: { ...etatEnchere, joueurCourantId: state.donneur } });
@@ -603,12 +666,16 @@ export const useGameStore = create<GameStore>()(
       }
 
       // Phase de transition pour annoncer le contrat final
+      const historique = state.etatEnchere.historique;
+      const emballeurId = historique.find(h => h.contrat?.id === 'emballe')?.joueurId;
+      const proposantId = historique.find(h => h.contrat?.id === 'propose')?.joueurId;
+
       set({
         phase: 'annonce_contrat',
         contratEnCours: {
           ...contratFinal,
-          // Si le partenaire s'est révélé durant les enchères (Bouche), on fixe son ID
-          partenaireId: state.partenaireRévélé ? (state.etatEnchere.historique.find(h => h.action === 'passe' && state.joueurs[h.joueurId].main.some(c => c.valeur === contratFinal.asPartenaire?.valeur && c.couleur === contratFinal.asPartenaire?.couleur))?.joueurId) : undefined
+          // Le partenaire est soit l'emballeur, soit celui déterminé par l'As (Trou)
+          partenaireId: emballeurId !== undefined ? (contratFinal.joueurId === emballeurId ? proposantId : emballeurId) : (state.partenaireRévélé ? (state.etatEnchere.historique.find(h => h.action === 'passe' && state.joueurs[h.joueurId].main.some(c => c.valeur === contratFinal.asPartenaire?.valeur && c.couleur === contratFinal.asPartenaire?.couleur))?.joueurId) : undefined)
         },
         atout: contratFinal.atout ?? null,
       });

@@ -11,14 +11,24 @@ import { Colors } from '../constants/theme';
 const adUnitId = __DEV__
   ? TestIds.ADAPTIVE_BANNER
   : Platform.select({
-      android: 'ca-app-pub-4266277576724378/1183186255', // ID réel (supposé ou à confirmer, sinon garder test)
-      ios: 'ca-app-pub-3940256099942544/2934735716',     // Test ID par défaut pour iOS
+      android: 'ca-app-pub-4266277576724378/2466658452',
+      ios: 'ca-app-pub-3940256099942544/2934735716',
     }) || TestIds.ADAPTIVE_BANNER;
 
-// Identifiant pour l'interstitiel de fin de partie
+// Identifiant pour l'interstitiel de fin de manche
 export const INTERSTITIAL_ID = __DEV__
   ? TestIds.INTERSTITIAL
   : 'ca-app-pub-4266277576724378/8938170215';
+
+// Identifiant pour l'interstitiel de fin de partie (Victoire/Score final)
+export const END_GAME_INTERSTITIAL_ID = __DEV__
+  ? TestIds.INTERSTITIAL
+  : 'ca-app-pub-4266277576724378/3423961991';
+
+// Identifiant pour la publicité récompensée (Avis coach)
+export const REWARDED_ID = __DEV__
+  ? TestIds.REWARDED
+  : 'ca-app-pub-4266277576724378/2043838232';
 
 interface AdBannerProps {
   marginTop?: number;

@@ -194,8 +194,10 @@ export const MancheResultat: React.FC<MancheResultatProps> = ({
         <View style={mancheStyles.header3DContainer}>
           <View style={[mancheStyles.header3D, reussite ? mancheStyles.header3DOk : mancheStyles.header3DFail]}>
             <View style={mancheStyles.header3DInner}>
-              <Text style={mancheStyles.header3DIcon}>{reussite ? '🏆' : '💣'}</Text>
-              <View>
+              <View style={mancheStyles.headerIconCircle}>
+                <Text style={mancheStyles.header3DIcon}>{reussite ? '🏆' : '💣'}</Text>
+              </View>
+              <View style={{ flex: 1 }}>
                 <Text style={mancheStyles.header3DTitre}>{reussite ? 'VICTOIRE !' : 'CHUTE...'}</Text>
                 <Text style={mancheStyles.header3DContrat}>
                   {contrat.nom}
@@ -245,7 +247,7 @@ export const MancheResultat: React.FC<MancheResultatProps> = ({
               <View key={j.id} style={mancheStyles.joueurRow}>
                 <View style={mancheStyles.joueurInfo}>
                   <Text style={mancheStyles.joueurNom}>
-                    {j.nom}{j.id === 0 ? ' (Vous)' : ''}{j.id === contrat.joueurId ? ' 🎯' : ''}{j.id === contrat.partenaireId ? ' 🤝' : ''}
+                    {j.id === 0 ? 'Vous' : j.nom}{j.id === contrat.joueurId ? ' 🎯' : ''}{j.id === contrat.partenaireId ? ' 🤝' : ''}
                   </Text>
                   <Text style={mancheStyles.joueurPlis}>{plis} pli{plis > 1 ? 's' : ''}</Text>
                 </View>
@@ -268,21 +270,39 @@ export const MancheResultat: React.FC<MancheResultatProps> = ({
           )}
         </View>
 
-        {!estScenario && (
           <View style={mancheStyles.section}>
             <Text style={mancheStyles.sectionLabel}>Classement total</Text>
-            {classement.map((j, rang) => (
-              <View key={j.id} style={mancheStyles.classementRow}>
-                <Text style={mancheStyles.rang}>{rang + 1}</Text>
-                <View style={mancheStyles.rangBar}>
-                  <View style={[mancheStyles.rangFill, { width: `${Math.max(5, (scoresTotal[j.id] / (Math.max(...scoresTotal, 1) || 1)) * 100)}%`, backgroundColor: j.id === 0 ? Colors.primary : Colors.bgSurface }]} />
-                </View>
-                <Text style={mancheStyles.rangNom}>{j.id === 0 ? 'Vous' : j.nom}</Text>
-                <Text style={mancheStyles.rangScore}>{scoresTotal[j.id]}</Text>
-              </View>
-            ))}
+            {(() => {
+              const maxScore = Math.max(...scoresTotal, 1);
+              const minScore = Math.min(...scoresTotal, 0);
+              const range = maxScore - minScore || 1;
+
+              return classement.map((j, rang) => {
+                const score = scoresTotal[j.id];
+                // Normalisation : 0% pour le score min, 100% pour le score max
+                const percentage = ((score - minScore) / range) * 100;
+
+                return (
+                  <View key={j.id} style={mancheStyles.classementRow}>
+                    <Text style={mancheStyles.rang}>{rang + 1}</Text>
+                    <View style={mancheStyles.rangBar}>
+                      <View style={[
+                        mancheStyles.rangFill,
+                        {
+                          width: `${Math.max(8, percentage)}%`,
+                          backgroundColor: j.id === 0 ? Colors.primary : Colors.bgSurface,
+                          borderWidth: j.id === 0 ? 0 : 1,
+                          borderColor: Colors.border
+                        }
+                      ]} />
+                    </View>
+                    <Text style={mancheStyles.rangNom}>{j.id === 0 ? 'Vous' : j.nom}</Text>
+                    <Text style={mancheStyles.rangScore}>{score}</Text>
+                  </View>
+                );
+              });
+            })()}
           </View>
-        )}
       </ScrollView>
 
       {/* Footer fixe pour les boutons - Toujours visible avec Safe Area Insets */}
@@ -313,14 +333,15 @@ const mancheStyles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.bg },
   content: { padding: Spacing.md },
   header3DContainer: { marginBottom: Spacing.lg, alignItems: 'center', marginTop: Spacing.sm },
-  header3D: { width: '100%', padding: Spacing.lg, borderRadius: Radius.lg, position: 'relative', overflow: 'hidden', zIndex: 2, borderWidth: 1, borderColor: 'rgba(255,255,255,0.3)' },
+  header3D: { width: '100%', paddingVertical: Spacing.md, paddingHorizontal: Spacing.lg, borderRadius: Radius.lg, position: 'relative', overflow: 'hidden', zIndex: 2, borderWidth: 1, borderColor: 'rgba(255,255,255,0.3)' },
   header3DInner: { flexDirection: 'row', alignItems: 'center', gap: Spacing.md },
+  headerIconCircle: { width: 56, height: 56, borderRadius: 28, backgroundColor: 'rgba(255,255,255,0.2)', justifyContent: 'center', alignItems: 'center' },
   header3DOk: { backgroundColor: Colors.primary },
   header3DFail: { backgroundColor: Colors.cardRed },
   header3DShadow: { position: 'absolute', bottom: -6, width: '98%', height: '100%', borderRadius: Radius.lg, zIndex: 1 },
   glossyEffect: { position: 'absolute', top: 0, left: 0, right: 0, height: '50%', backgroundColor: 'rgba(255,255,255,0.15)' },
-  header3DIcon: { fontSize: 40 },
-  header3DTitre: { fontSize: FontSize.xl, fontWeight: FontWeight.black, color: '#fff', textShadowColor: 'rgba(0,0,0,0.3)', textShadowOffset: { width: 1, height: 1 }, textShadowRadius: 3 },
+  header3DIcon: { fontSize: 32 },
+  header3DTitre: { fontSize: FontSize.lg, fontWeight: FontWeight.black, color: '#fff', textShadowColor: 'rgba(0,0,0,0.3)', textShadowOffset: { width: 1, height: 1 }, textShadowRadius: 3 },
   header3DContrat: { fontSize: FontSize.sm, color: 'rgba(255,255,255,0.9)', fontWeight: FontWeight.bold },
   details: { fontSize: FontSize.xs, color: Colors.textSecondary, textAlign: 'center', marginBottom: Spacing.sm, fontStyle: 'italic' },
   noteEntrainement: {
@@ -343,8 +364,8 @@ const mancheStyles = StyleSheet.create({
   rang: { fontSize: FontSize.sm, color: Colors.textMuted, fontWeight: FontWeight.bold, width: 20, textAlign: 'center' },
   rangBar: { flex: 1, height: 6, backgroundColor: Colors.bgSurface, borderRadius: Radius.full, overflow: 'hidden' },
   rangFill: { height: '100%', borderRadius: Radius.full },
-  rangNom: { fontSize: FontSize.sm, color: Colors.textSecondary, width: 60 },
-  rangScore: { fontSize: FontSize.md, fontWeight: FontWeight.bold, color: Colors.textPrimary, width: 36, textAlign: 'right' },
+  rangNom: { fontSize: FontSize.sm, color: Colors.textSecondary, width: 80, fontWeight: FontWeight.medium },
+  rangScore: { fontSize: FontSize.md, fontWeight: FontWeight.bold, color: Colors.textPrimary, flex: 1, textAlign: 'right' },
   coachContainer: {
     backgroundColor: '#FFF9C4', // Jaune clair pédagogique
     borderRadius: Radius.md,

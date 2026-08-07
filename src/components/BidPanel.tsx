@@ -12,6 +12,7 @@ import { ContratConfig, VariantConfig } from '../variants/types';
 import { SYMBOLE, estRouge } from '../engine/deck';
 import { choisirEnchere } from '../ai/SimpleAI';
 import { useSettingsStore } from '../store/settingsStore';
+import { useTranslation } from '../i18n';
 import {
   Colors, Spacing, FontSize, FontWeight, Radius,
 } from '../constants/theme';
@@ -43,14 +44,23 @@ export const BidPanel: React.FC<BidPanelProps> = ({
   const [atoutSel, setAtoutSel] = useState<Couleur | null>(null);
   const [asPartenaireSel, setAsPartenaireSel] = useState<Carte | null>(null);
   const [etape, setEtape] = useState<'contrat' | 'atout' | 'as'>('contrat');
+  const [coachUnlocked, setCoachUnlocked] = useState(false);
 
-  const ordreCouleurs = useSettingsStore(s => s.ordreCouleurs);
+  const { ordreCouleurs, coachCredits, useCoachCredit } = useSettingsStore();
+  const { t } = useTranslation();
 
   // Recommendation IA pour l'apprentissage
   const recommendation = React.useMemo(() => {
     if (!modeApprentissage) return null;
     return choisirEnchere(main, variante, meilleureEnchere as any, 'expert', ordreCouleurs);
   }, [main, variante, meilleureEnchere, modeApprentissage, ordreCouleurs]);
+
+  const handleUnlockCoach = () => {
+    if (useCoachCredit()) {
+      setCoachUnlocked(true);
+      if (useSettingsStore.getState().vibration) Vibration.vibrate(30);
+    }
+  };
 
   // Détection du Trou (3 As) ou Trou Royal (4 As) - Obligatoire au Whist de Gand
   const forceTrou = React.useMemo(() => {
@@ -186,30 +196,50 @@ export const BidPanel: React.FC<BidPanelProps> = ({
       {/* Recommendation Apprentissage */}
       {modeApprentissage && recommendation && (
         <View style={styles.recommendationBox}>
-          <View style={styles.recommendationHeader}>
-            <Text style={styles.recommendationTitre}>💡 Conseil de l'expert</Text>
-            {recommendation.action !== 'passe' && (
+          {!coachUnlocked ? (
+            <View style={styles.lockedCoach}>
+              <View style={styles.coachHeader}>
+                <Text style={styles.recommendationTitre}>💡 {t('settings.coachCredits') || 'Avis du coach'}</Text>
+                <View style={styles.creditBadge}>
+                  <Text style={styles.creditText}>{coachCredits} 🪙</Text>
+                </View>
+              </View>
               <TouchableOpacity
-                style={styles.btnAppliquer}
-                onPress={() => onEnchere(recommendation.contratId!, recommendation.atout, recommendation.asPartenaire ? { id: recommendation.asPartenaire, valeur: 14 as any, couleur: recommendation.asPartenaire.split('_')[1] as any } : undefined)}
+                style={[styles.btnUnlock, coachCredits <= 0 && styles.btnDisabled]}
+                onPress={handleUnlockCoach}
+                disabled={coachCredits <= 0}
               >
-                <Text style={styles.btnAppliquerTexte}>Appliquer</Text>
+                <Text style={styles.btnUnlockTexte}>Demander l'avis (1 🪙)</Text>
               </TouchableOpacity>
-            )}
-            {recommendation.action === 'passe' && (
-              <TouchableOpacity style={styles.btnAppliquer} onPress={onPasse}>
-                <Text style={styles.btnAppliquerTexte}>Passer</Text>
-              </TouchableOpacity>
-            )}
-          </View>
-          <Text style={styles.recommendationTexte}>
-            {recommendation.action === 'passe'
-              ? "Votre main est un peu faible pour cette enchère. Je vous conseille de passer."
-              : `Je vous suggère d'annoncer "${
-                  variante.contrats.find(c => c.id === recommendation.contratId)?.nom
-                }"${recommendation.atout ? ` à ${SYMBOLE[recommendation.atout]}` : ""}. Vous avez une main solide pour ce contrat.`
-            }
-          </Text>
+            </View>
+          ) : (
+            <>
+              <View style={styles.recommendationHeader}>
+                <Text style={styles.recommendationTitre}>💡 Conseil de l'expert</Text>
+                {recommendation.action !== 'passe' && (
+                  <TouchableOpacity
+                    style={styles.btnAppliquer}
+                    onPress={() => onEnchere(recommendation.contratId!, recommendation.atout, recommendation.asPartenaire ? { id: recommendation.asPartenaire, valeur: 14 as any, couleur: recommendation.asPartenaire.split('_')[1] as any } : undefined)}
+                  >
+                    <Text style={styles.btnAppliquerTexte}>Appliquer</Text>
+                  </TouchableOpacity>
+                )}
+                {recommendation.action === 'passe' && (
+                  <TouchableOpacity style={styles.btnAppliquer} onPress={onPasse}>
+                    <Text style={styles.btnAppliquerTexte}>Passer</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+              <Text style={styles.recommendationTexte}>
+                {recommendation.action === 'passe'
+                  ? "Votre main est un peu faible pour cette enchère. Je vous conseille de passer."
+                  : `Je vous suggère d'annoncer "${
+                      variante.contrats.find(c => c.id === recommendation.contratId)?.nom
+                    }"${recommendation.atout ? ` à ${SYMBOLE[recommendation.atout]}` : ""}. Vous avez une main solide pour ce contrat.`
+                }
+              </Text>
+            </>
+          )}
         </View>
       )}
 
@@ -296,7 +326,34 @@ export const BidPanel: React.FC<BidPanelProps> = ({
           </View>
         )}
 
-        {/* ── Boutons d'action ────────────────────── */}
+        {/* Bouton Passer (même look que les autres) */}
+        <TouchableOpacity
+          style={[
+            styles.contratBtn,
+            forceTrou && styles.btnDisabled,
+            peutBoucher && { borderColor: Colors.primary, backgroundColor: '#f0fcf9' }
+          ]}
+          onPress={() => {
+            if (useSettingsStore.getState().vibration) Vibration.vibrate(20);
+            onPasse();
+          }}
+          disabled={!!forceTrou}
+        >
+          <View style={styles.contratInfo}>
+            <Text style={[styles.contratNom, peutBoucher && { color: Colors.primary }]}>
+              {forceTrou ? "Trou Obligatoire" : (peutBoucher ? "Je bouche (Accepter)" : "Passer")}
+            </Text>
+            <Text style={styles.contratDesc}>
+              {forceTrou ? "Vous devez annoncer le Trou." : "Je ne joue pas ce coup."}
+            </Text>
+          </View>
+          <View style={styles.pointsBadge}>
+            <Text style={[styles.pointsVal, { color: Colors.textMuted }]}>0</Text>
+            <Text style={styles.pointsLabel}>pts</Text>
+          </View>
+        </TouchableOpacity>
+
+        {/* ── Boutons d'action (Confirmation seulement) ── */}
         <View style={styles.actions}>
           {contratSel && (
             <TouchableOpacity
@@ -310,23 +367,6 @@ export const BidPanel: React.FC<BidPanelProps> = ({
               </Text>
             </TouchableOpacity>
           )}
-
-          <TouchableOpacity
-            style={[
-              styles.btnPasse,
-              forceTrou && styles.btnDisabled,
-              peutBoucher && { borderColor: Colors.primary, backgroundColor: Colors.bgSurface }
-            ]}
-            onPress={() => {
-              if (useSettingsStore.getState().vibration) Vibration.vibrate(20);
-              onPasse();
-            }}
-            disabled={!!forceTrou}
-          >
-            <Text style={[styles.btnPasseTexte, peutBoucher && { color: Colors.primary, fontWeight: 'bold' }]}>
-              {forceTrou ? "Trou Obligatoire" : (peutBoucher ? "Je bouche (Accepter)" : "Passer")}
-            </Text>
-          </TouchableOpacity>
         </View>
 
         {/* ── Historique enchères ─────────────────── */}
@@ -384,40 +424,82 @@ const styles = StyleSheet.create({
   },
 
   recommendationBox: {
-    backgroundColor: '#fff9c4',
-    padding: Spacing.sm,
-    borderRadius: Radius.md,
-    marginBottom: Spacing.sm,
-    borderLeftWidth: 4,
-    borderLeftColor: '#fbc02d',
+    backgroundColor: '#fffbe6',
+    padding: Spacing.md,
+    borderRadius: Radius.lg,
+    marginBottom: Spacing.md,
+    borderWidth: 1,
+    borderColor: '#ffe58f',
+    // Ombre pédagogique
+    shadowColor: '#d48806',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
   },
   recommendationHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 4,
+    marginBottom: Spacing.sm,
   },
   btnAppliquer: {
-    backgroundColor: '#fbc02d',
-    paddingHorizontal: Spacing.sm,
-    paddingVertical: 2,
-    borderRadius: Radius.sm,
+    backgroundColor: '#faad14',
+    paddingHorizontal: Spacing.lg,
+    paddingVertical: 4,
+    borderRadius: Radius.full,
   },
   btnAppliquerTexte: {
-    fontSize: 10,
+    fontSize: FontSize.xs,
     fontWeight: FontWeight.bold,
-    color: '#bc5100',
+    color: '#fff',
   },
   recommendationTitre: {
-    fontSize: FontSize.sm,
+    fontSize: FontSize.md,
     fontWeight: FontWeight.bold,
-    color: '#bc5100',
-    marginBottom: 4,
+    color: '#d48806',
   },
   recommendationTexte: {
-    fontSize: FontSize.xs,
-    color: '#5d4037',
-    lineHeight: 16,
+    fontSize: FontSize.sm,
+    color: '#856404',
+    lineHeight: 20,
+    fontStyle: 'italic',
+  },
+
+  lockedCoach: {
+    alignItems: 'center',
+  },
+  coachHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    width: '100%',
+    marginBottom: Spacing.sm,
+  },
+  creditBadge: {
+    backgroundColor: '#fff',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: Radius.full,
+    borderWidth: 1,
+    borderColor: '#ffe58f',
+  },
+  creditText: {
+    fontSize: 12,
+    fontWeight: 'bold',
+    color: '#d48806',
+  },
+  btnUnlock: {
+    backgroundColor: '#faad14',
+    paddingHorizontal: Spacing.xl,
+    paddingVertical: 8,
+    borderRadius: Radius.full,
+    marginTop: 4,
+  },
+  btnUnlockTexte: {
+    color: '#fff',
+    fontWeight: 'bold',
+    fontSize: FontSize.sm,
   },
 
   sectionLabel: {
@@ -432,33 +514,40 @@ const styles = StyleSheet.create({
 
   // Boutons contrat
   contratBtn: {
-    backgroundColor: Colors.bgCard,
+    backgroundColor: Colors.bgSurface,
     borderRadius: Radius.lg,
-    borderWidth: 0.5,
+    borderWidth: 1,
     borderColor: Colors.border,
     padding: Spacing.md,
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: Spacing.sm,
+    // Ombre douce
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 2,
   },
   contratBtnSel: {
-    borderWidth: 1.5,
+    borderWidth: 2,
     borderColor: Colors.primary,
-    backgroundColor: Colors.bgSurface,
+    backgroundColor: '#f0fcf9',
+    elevation: 4,
   },
   contratInfo: {
     flex: 1,
   },
   contratNom: {
-    fontSize: FontSize.md,
-    fontWeight: FontWeight.semibold,
+    fontSize: FontSize.lg,
+    fontWeight: FontWeight.bold,
     color: Colors.textPrimary,
   },
   contratDesc: {
-    fontSize: FontSize.xs,
-    color: Colors.textMuted,
-    marginTop: 3,
-    lineHeight: 16,
+    fontSize: FontSize.sm,
+    color: Colors.textSecondary,
+    marginTop: 4,
+    lineHeight: 18,
   },
   tagsRow: {
     flexDirection: 'row',

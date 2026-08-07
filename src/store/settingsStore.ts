@@ -17,6 +17,9 @@ interface SettingsState {
   hasSeenOnboarding: boolean;
   vibration: boolean;
   son: boolean;
+  animationDonne: boolean;
+  coachCredits: number;
+  lastDailyRewardDate: string | null;
 
   setOrdreCouleurs: (ordre: OrdreTriCouleur) => void;
   setOrdreValeur: (ordre: OrdreValeur) => void;
@@ -26,6 +29,10 @@ interface SettingsState {
   setHasSeenOnboarding: (val: boolean) => void;
   setVibration: (val: boolean) => void;
   setSon: (val: boolean) => void;
+  setAnimationDonne: (val: boolean) => void;
+  useCoachCredit: () => boolean;
+  addCoachCredits: (amount: number) => void;
+  checkDailyReward: () => void;
 }
 
 const DEFAULT_ORDRE_COULEURS: OrdreTriCouleur = [
@@ -37,7 +44,7 @@ const DEFAULT_ORDRE_COULEURS: OrdreTriCouleur = [
 
 export const useSettingsStore = create<SettingsState>()(
   persist(
-    (set) => ({
+    (set, get) => ({
       ordreCouleurs: DEFAULT_ORDRE_COULEURS,
       ordreValeur: 'croissant',
       directionTri: 'gauche_droite',
@@ -46,6 +53,9 @@ export const useSettingsStore = create<SettingsState>()(
       hasSeenOnboarding: false,
       vibration: true,
       son: true,
+      animationDonne: true,
+      coachCredits: 5,
+      lastDailyRewardDate: null,
 
       setOrdreCouleurs: (ordre) => set({ ordreCouleurs: ordre }),
       setOrdreValeur: (ordre) => set({ ordreValeur: ordre }),
@@ -55,6 +65,26 @@ export const useSettingsStore = create<SettingsState>()(
       setHasSeenOnboarding: (val) => set({ hasSeenOnboarding: val }),
       setVibration: (val) => set({ vibration: val }),
       setSon: (val) => set({ son: val }),
+      setAnimationDonne: (val) => set({ animationDonne: val }),
+      useCoachCredit: () => {
+        const { coachCredits } = get();
+        if (coachCredits > 0) {
+          set({ coachCredits: coachCredits - 1 });
+          return true;
+        }
+        return false;
+      },
+      addCoachCredits: (amount) => set({ coachCredits: get().coachCredits + amount }),
+      checkDailyReward: () => {
+        const { lastDailyRewardDate, coachCredits } = get();
+        const today = new Date().toISOString().split('T')[0];
+        if (lastDailyRewardDate !== today) {
+          set({
+            coachCredits: coachCredits + 2,
+            lastDailyRewardDate: today
+          });
+        }
+      },
     }),
     {
       name: 'allwhist-settings',

@@ -1,360 +1,63 @@
-// ─────────────────────────────────────────────
-//  COMPOSANT — Carte
-// ─────────────────────────────────────────────
-
-import React, { useRef, useEffect } from 'react';
-import {
-  TouchableOpacity, View, Text, StyleSheet, Animated, Image, Easing,
-} from 'react-native';
+import React from 'react';
+import { View, Text, StyleSheet, Image, TouchableOpacity } from 'react-native';
 import { Carte, Couleur } from '../engine/types';
-import { SYMBOLE, LABEL_VALEUR, estRouge } from '../engine/deck';
-import { Colors, CardSize, FontSize, FontWeight, Shadows, Radius } from '../constants/theme';
+import { LABEL_VALEUR, estRouge } from '../engine/deck';
+import { Colors, CardSize, Shadows } from '../constants/theme';
 
-// ─── Types ─────────────────────────────────────
-
-interface CardProps {
-  carte: Carte;
-  selectionne?: boolean;
-  jouable?: boolean;
-  onPress?: (carte: Carte) => void;
-  taille?: 'normal' | 'table' | 'mini';
-  style?: object;
-}
-
-interface CardBackProps {
-  orientation?: 'vertical' | 'horizontal';
-  taille?: 'normal' | 'mini';
-  rotation?: string; // Ajouté pour un contrôle précis
-  style?: object;
-}
-
-// ─── Carte face ────────────────────────────────
-
-const ASSETS_COULEURS: Record<string, any> = {
+const SYM: Record<string, any> = {
   [Couleur.COEUR]: require('../../assets/coeur.png'),
   [Couleur.CARREAU]: require('../../assets/carreau.png'),
   [Couleur.TREFLE]: require('../../assets/trefle.png'),
   [Couleur.PIQUE]: require('../../assets/pique.png'),
 };
 
-export const CardFace: React.FC<CardProps> = ({
-  carte,
-  selectionne = false,
-  jouable = true,
-  onPress,
-  taille = 'normal',
-  style,
-}) => {
+export const CardFace: React.FC<any> = ({ carte, selectionne, jouable = true, onPress, taille = 'normal' }) => {
   const isTable = taille === 'table';
-  // Animation interne désactivée pour la table (conflit parent)
-  const scaleAnim = useRef(new Animated.Value(isTable ? 1 : 0.95)).current;
-  const opacityAnim = useRef(new Animated.Value(isTable ? 1 : 0.8)).current;
+  const dim = isTable ? CardSize.table : (taille === 'mini' ? CardSize.mini : CardSize.hand);
+  const isRed = estRouge(carte.couleur);
+  const color = isRed ? Colors.cardRed : Colors.cardBlue;
+  const label = carte.estJoker ? 'J' : LABEL_VALEUR[carte.valeur];
 
-  // Animation d'apparition fluide
-  useEffect(() => {
-    if (isTable) return; // Ne pas animer si c'est sur la table (géré par le parent)
-
-    Animated.parallel([
-      Animated.timing(scaleAnim, {
-        toValue: 1,
-        duration: 300,
-        easing: Easing.out(Easing.cubic),
-        useNativeDriver: true,
-      }),
-      Animated.timing(opacityAnim, {
-        toValue: 1,
-        duration: 300,
-        easing: Easing.out(Easing.cubic),
-        useNativeDriver: true,
-      }),
-    ]).start();
-  }, [scaleAnim, opacityAnim, isTable]);
-
-  let dim = CardSize.hand;
-  if (taille === 'table') dim = CardSize.table;
-  if (taille === 'mini')  dim = CardSize.mini;
-
-  const rouge = estRouge(carte.couleur);
-  const couleurTexte = rouge ? Colors.cardRed : Colors.cardBlue;
-  const valLabel = carte.estJoker ? 'J' : LABEL_VALEUR[carte.valeur];
-  const symImage = !carte.estJoker ? ASSETS_COULEURS[carte.couleur] : null;
-
-  const isMini = taille === 'mini';
-
-  // Tailles de police adaptatives
-  const fontSizeValeur = isMini ? 14 : (isTable ? 32 : 18);
-  const fontSizeSymCorner = isMini ? 10 : (isTable ? 20 : 12);
-
-  const cardStyle = [
-    styles.card,
-    {
-      width: dim.width,
-      height: dim.height,
-      borderRadius: dim.radius,
-      padding: isMini ? 3 : (isTable ? 8 : 4),
-    },
-    selectionne && styles.selectionne,
-    !jouable && styles.nonJouable,
-    style,
-  ];
-
-  const animatedCardStyle = {
-    transform: [
-      { scale: scaleAnim },
-    ],
-    opacity: opacityAnim,
-  };
-
-  const cardContent = (
-    <Animated.View style={[cardStyle, animatedCardStyle]}>
-      {/* Coin haut-gauche */}
-      <View style={[styles.corner, { gap: isMini ? -4 : -2 }]}>
-        <Text style={[styles.valeur, { color: couleurTexte, fontSize: fontSizeValeur, lineHeight: fontSizeValeur }]}>
-          {valLabel}
-        </Text>
-        {taille !== 'table' && (
-          symImage ? (
-            <Image source={symImage} style={{ width: fontSizeSymCorner, height: fontSizeSymCorner, resizeMode: 'contain' }} />
-          ) : (
-            <Text style={[styles.symboleCorner, { color: couleurTexte, fontSize: fontSizeSymCorner }]}>★</Text>
-          )
-        )}
+  const content = (
+    <View style={[styles.card, { width: dim.width, height: dim.height }, selectionne && styles.sel, !jouable && { opacity: 0.4 }]}>
+      {/* Top Left: Value + Suit icon below */}
+      <View style={styles.topContainer}>
+        <Text style={[styles.val, { color, fontSize: Math.floor(dim.width * 0.35) }]}>{label}</Text>
+        <Image source={SYM[carte.couleur]} style={{ width: dim.width * 0.22, height: dim.width * 0.22, marginTop: -2 }} resizeMode="contain" />
       </View>
 
-      {/* Symbole central */}
-      <View style={styles.centerContainer}>
-        {symImage ? (
-          <Image
-            source={symImage}
-            style={{ width: isMini ? 18 : (isTable ? 56 : 32), height: isMini ? 18 : (isTable ? 56 : 32), resizeMode: 'contain' }}
-          />
-        ) : (
-          <Text style={[styles.symboleCentral, { color: couleurTexte, fontSize: isMini ? 24 : (isTable ? 72 : 44) }]}>★</Text>
-        )}
+      {/* Center: Large Suit Image */}
+      <View style={styles.center}>
+        <Image source={SYM[carte.couleur]} style={{ width: dim.width * 0.55, height: dim.width * 0.55 }} resizeMode="contain" />
       </View>
-
-      {/* Coin bas-droit (inversé symétriquement) */}
-      <View style={[styles.corner, styles.cornerBas, { gap: isMini ? -4 : -2 }]}>
-        {taille !== 'table' && (
-          symImage ? (
-            <Image source={symImage} style={{ width: fontSizeSymCorner, height: fontSizeSymCorner, resizeMode: 'contain', transform: [{ rotate: '180deg' }] }} />
-          ) : (
-            <Text style={[styles.symboleCorner, { color: couleurTexte, fontSize: fontSizeSymCorner, transform: [{ rotate: '180deg' }] }]}>★</Text>
-          )
-        )}
-        <Text style={[
-          styles.valeur,
-          {
-            color: couleurTexte,
-            fontSize: isTable ? fontSizeValeur : fontSizeValeur * 0.8,
-            lineHeight: isTable ? fontSizeValeur : fontSizeValeur * 0.8,
-            transform: [{ rotate: '180deg' }]
-          }
-        ]}>
-          {valLabel}
-        </Text>
-      </View>
-
-      {jouable && !isMini && <View style={styles.jouableIndicateur} />}
-    </Animated.View>
-  );
-
-  if (onPress) {
-    return (
-      <TouchableOpacity
-        onPress={() => onPress(carte)}
-        disabled={!jouable}
-        activeOpacity={0.85}
-        style={selectionne ? styles.selectionneWrapper : undefined}
-      >
-        {cardContent}
-      </TouchableOpacity>
-    );
-  }
-
-  return cardContent;
-};
-
-// ─── Carte dos ─────────────────────────────────
-
-export const CardBack: React.FC<CardBackProps> = ({
-  orientation = 'vertical',
-  taille = 'normal',
-  rotation,
-  style,
-}) => {
-  const scaleAnim = useRef(new Animated.Value(0.9)).current;
-
-  useEffect(() => {
-    Animated.timing(scaleAnim, {
-      toValue: 1,
-      duration: 250,
-      easing: Easing.out(Easing.cubic),
-      useNativeDriver: true,
-    }).start();
-  }, [scaleAnim]);
-
-  const isH = orientation === 'horizontal';
-  const dim = CardSize.back;
-
-  return (
-    <Animated.View
-      style={[
-        styles.cardBack,
-        {
-          width:  isH ? dim.height : dim.width,
-          height: isH ? dim.width  : dim.height,
-          borderRadius: dim.radius,
-          overflow: 'hidden',
-          transform: [
-            { scale: scaleAnim },
-            { rotate: rotation || '0deg' }
-          ],
-        },
-        style,
-        // Forcer les dimensions passées en prop style (ex: CardSize.table)
-        style && (style as any).width ? { width: (style as any).width, height: (style as any).height } : {},
-      ]}
-    >
-      <Image
-        source={require('../../assets/allwhist_icon_512x512.png')}
-        style={{ width: '100%', height: '100%', opacity: 0.8 }}
-      />
-    </Animated.View>
-  );
-};
-
-// ─── Pile de cartes dos (adversaire) ───────────
-
-interface HandBackProps {
-  nbCartes: number;
-  orientation?: 'horizontal' | 'vertical';
-  rotationCards?: string; // Rotation spécifique des cartes
-}
-
-export const HandBack: React.FC<HandBackProps> = ({ nbCartes, orientation = 'horizontal', rotationCards }) => {
-  const visible = Math.min(nbCartes, 7);
-  const isV = orientation === 'vertical';
-
-  return (
-    <View style={isV ? styles.handBackV : styles.handBackH}>
-      {Array.from({ length: visible }).map((_, i) => (
-        <CardBack
-          key={i}
-          orientation="vertical"
-          rotation={rotationCards}
-          style={isV
-            ? { marginTop: i === 0 ? 0 : -45 }
-            : { marginLeft: i === 0 ? 0 : -20 }
-          }
-        />
-      ))}
     </View>
   );
+
+  return onPress ? (
+    <TouchableOpacity onPress={() => onPress(carte)} disabled={!jouable} activeOpacity={0.9} style={selectionne ? { transform: [{ translateY: -15 }] } : null}>
+      {content}
+    </TouchableOpacity>
+  ) : content;
 };
 
-// ─── Styles ────────────────────────────────────
+export const CardBack: React.FC<any> = ({ style }) => (
+  <View style={[styles.card, { backgroundColor: '#f0f4f7', width: 34, height: 46 }, style]}>
+    <Image source={require('../../assets/allwhist_icon_512x512.png')} style={{ width: '100%', height: '100%', opacity: 1.0 }} resizeMode="contain" />
+  </View>
+);
+
+export const HandBack: React.FC<any> = ({ nbCartes, orientation }) => (
+  <View style={{ flexDirection: orientation === 'vertical' ? 'column' : 'row', height: orientation === 'vertical' ? 100 : 'auto', alignItems: 'center' }}>
+    {Array.from({ length: Math.min(nbCartes, 6) }).map((_, i) => (
+      <CardBack key={i} style={orientation === 'vertical' ? { marginTop: i ? -35 : 0 } : { marginLeft: i ? -25 : 0 }} />
+    ))}
+  </View>
+);
 
 const styles = StyleSheet.create({
-  card: {
-    backgroundColor: '#fff',
-    borderWidth: 0.5,
-    borderColor: '#ddd',
-    justifyContent: 'space-between',
-    padding: 5,
-    ...Shadows.card,
-  },
-  selectionneWrapper: {
-    transform: [{ translateY: -12 }],
-  },
-  selectionne: {
-    borderWidth: 2,
-    borderColor: Colors.primary,
-  },
-  nonJouable: {
-    opacity: 0.4,
-  },
-  corner: {
-    alignItems: 'flex-start',
-  },
-  cornerBas: {
-    alignItems: 'flex-end',
-    justifyContent: 'flex-end',
-  },
-  centerContainer: {
-    ...StyleSheet.absoluteFillObject,
-    justifyContent: 'center',
-    alignItems: 'center',
-    zIndex: -1,
-  },
-  valeur: {
-    fontWeight: FontWeight.black,
-  },
-  symboleCorner: {
-    fontSize: FontSize.sm,
-    fontWeight: FontWeight.bold,
-    lineHeight: FontSize.sm,
-  },
-  symboleCornerImage: {
-    width: 14,
-    height: 14,
-    resizeMode: 'contain',
-  },
-  symboleCentral: {
-    fontSize: FontSize.cardLg,
-    fontWeight: FontWeight.black,
-    textAlign: 'center',
-    position: 'absolute',
-    alignSelf: 'center',
-    top: '38%',
-    // Effet brillant/glossy inspiré de l'image
-    textShadowColor: 'rgba(255, 255, 255, 0.6)',
-    textShadowOffset: { width: 0, height: 0 },
-    textShadowRadius: 10,
-  },
-  symboleCentralImage: {
-    width: 35,
-    height: 35,
-    position: 'absolute',
-    alignSelf: 'center',
-    top: '50%',
-    marginTop: -17.5, // Centrage vertical parfait
-    resizeMode: 'contain',
-    zIndex: -1, // S'assurer que les coins passent devant si nécessaire
-  },
-  jouableIndicateur: {
-    position: 'absolute',
-    bottom: 3,
-    right: 3,
-    width: 5,
-    height: 5,
-    borderRadius: 3,
-    backgroundColor: Colors.primary,
-    opacity: 0.7,
-  },
-
-  // Dos de carte
-  cardBack: {
-    backgroundColor: Colors.bgCard,
-    borderWidth: 0.5,
-    borderColor: Colors.borderLight,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  cardBackInner: {
-    width: '70%',
-    height: '70%',
-    borderWidth: 0.5,
-    borderColor: Colors.borderLight,
-    borderRadius: 2,
-  },
-
-  handBackH: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  handBackV: {
-    flexDirection: 'column',
-    alignItems: 'center',
-  },
+  card: { backgroundColor: '#fff', borderRadius: 6, borderWidth: 1, borderColor: '#ccc', padding: 2, elevation: 3, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.2, shadowRadius: 2, overflow: 'hidden' },
+  sel: { borderColor: '#1D9E75', borderWidth: 2.5 },
+  topContainer: { alignItems: 'flex-start', paddingLeft: 1, paddingTop: 1 },
+  val: { fontWeight: '900', textAlign: 'left', letterSpacing: -1 },
+  center: { ...StyleSheet.absoluteFillObject, justifyContent: 'center', alignItems: 'center', zIndex: -1 },
 });
