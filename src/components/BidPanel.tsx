@@ -52,7 +52,7 @@ export const BidPanel: React.FC<BidPanelProps> = ({
   // Recommendation IA pour l'apprentissage
   const recommendation = React.useMemo(() => {
     if (!modeApprentissage) return null;
-    return choisirEnchere(main, variante, meilleureEnchere as any, 'expert', ordreCouleurs);
+    return choisirEnchere(main, variante, meilleureEnchere as any, 'expert', 0, ordreCouleurs);
   }, [main, variante, meilleureEnchere, modeApprentissage, ordreCouleurs]);
 
   const handleUnlockCoach = () => {
@@ -91,20 +91,23 @@ export const BidPanel: React.FC<BidPanelProps> = ({
 
     const currentPrio = meilleureEnchere?.priorite ?? -1;
 
-    // L'annonce "Demande" doit toujours être disponible tant qu'aucune enchère
-    // supérieure (Solo, Misère...) n'a été placée.
-    if (c.id === 'demande') {
-      return currentPrio <= 1;
+    // "Je propose" est disponible si aucune enchère supérieure n'a été faite
+    if (c.id === 'propose') {
+      return currentPrio < 1;
     }
 
-    // Si on a 3 ou 4 As, on est forcé de proposer un Trou,
-    // mais on laisse "Demande" par flexibilité comme demandé.
+    // "J'emballe" est disponible uniquement si la meilleure enchère est "Je propose"
+    if (c.id === 'emballe') {
+      return meilleureEnchere?.id === 'propose';
+    }
+
+    // Si on a 3 ou 4 As, on est forcé de proposer un Trou
     if (forceTrou) {
-      return c.id === forceTrou || c.id === 'demande';
+      return c.id === forceTrou || c.id === 'propose';
     }
 
     // Vérifier si le contrat est disponible selon la main
-    if (c.disponibleSi && !c.disponibleSi(main, meilleureEnchere as any)) {
+    if (c.disponibleSi && !c.disponibleSi(main, meilleureEnchere as any, 0)) {
       return false;
     }
 
@@ -127,7 +130,10 @@ export const BidPanel: React.FC<BidPanelProps> = ({
     setAtoutSel(null);
     setAsPartenaireSel(null);
 
-    if (contrat.sanAtout) {
+    if (contrat.id === 'propose' || contrat.id === 'emballe') {
+      // Proposition/Emballage : Choix de l'atout puis validation (pas d'As)
+      setEtape('atout');
+    } else if (contrat.sanAtout) {
       // Misère → pas d'atout, aller directement à l'As si nécessaire
       setEtape(contrat.partenaire ? 'as' : 'contrat');
     } else if (variante.atoutChoisi && !contrat.sanAtout) {
@@ -163,7 +169,10 @@ export const BidPanel: React.FC<BidPanelProps> = ({
 
   // Cartes disponibles pour désigner le partenaire (As ou Roi de Cœur pour Trou Royal)
   const cartesPartenairesDisponibles = React.useMemo(() => {
-    if (contratSel?.id === 'trou_royal') {
+    // Si le contrat ne demande pas de partenaire via un As, on n'affiche rien
+    if (!contratSel?.partenaire) return [];
+
+    if (contratSel.id === 'trou_royal') {
       // Pour Trou Royal, on cherche le Roi de Cœur par défaut
       const roiCoeurInMain = main.find(c => c.valeur === 13 && c.couleur === Couleur.COEUR);
       if (roiCoeurInMain) return [];

@@ -380,6 +380,7 @@ export const useGameStore = create<GameStore>()(
             })),
             plis: nouveauxPlis,
             resultat: resultat,
+            erreurs: toutesErreurs,
             historiqueEncheres: state.etatEnchere.historique,
             timestamp: new Date().toISOString()
           });
@@ -707,7 +708,7 @@ export const useGameStore = create<GameStore>()(
       variante,
       etatEnchere.meilleureEnchere,
       niveau,
-      // On pourrait passer les préférences de l'IA ici si on en avait
+      etatEnchere.joueurCourantId,
     );
 
     if (decision.action === 'passe') {

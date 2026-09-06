@@ -38,7 +38,7 @@ export const WhistGand: VariantConfig = {
       nom: 'Je propose',
       description: 'Chercher un partenaire pour faire 8 plis.',
       plisMin: 8, plisMax: 13,
-      seul: false, partenaire: true,
+      seul: false, partenaire: false, // Plus de choix d'As ici
       pointsReussite: 7, pointsEchec: 10,
       sanAtout: false, cartesVisibles: false,
       priorite: 1,
@@ -48,11 +48,14 @@ export const WhistGand: VariantConfig = {
       nom: "J'emballe",
       description: "S'allier avec le proposant pour faire 8 plis ensemble.",
       plisMin: 8, plisMax: 13,
-      seul: false, partenaire: true,
+      seul: false, partenaire: false, // Plus de choix d'As ici
       pointsReussite: 7, pointsEchec: 10,
       sanAtout: false, cartesVisibles: false,
-      priorite: 1.5, // Plus haut que Propose (1) pour être sélectionnable
-      disponibleSi: (main, meilleureEnchere) => meilleureEnchere?.id === 'propose',
+      priorite: 1.5,
+      disponibleSi: (main, meilleureEnchere, joueurId) => {
+        // Un joueur ne peut pas emballer sa propre proposition
+        return meilleureEnchere?.id === 'propose' && meilleureEnchere.joueurId !== joueurId;
+      },
     },
     {
       id: 'trou',

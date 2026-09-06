@@ -1,7 +1,10 @@
 import { initializeApp } from 'firebase/app';
 import { initializeAuth, getReactNativePersistence, signInAnonymously, onAuthStateChanged, User } from 'firebase/auth';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { getFirestore, doc, setDoc, getDoc, collection, addDoc, query, where, getDocs } from 'firebase/firestore';
+import {
+  getFirestore, doc, setDoc, getDoc, collection, addDoc, query, where, getDocs
+} from 'firebase/firestore';
+import { GoogleAuthProvider, signInWithCredential, linkWithCredential } from 'firebase/auth';
 
 const firebaseConfig = {
   projectId: "allwhist-61182",
@@ -22,10 +25,30 @@ export const db = getFirestore(app);
 // Authentication helper
 export const loginAnonymously = async () => {
   try {
+    console.log("Tentative de connexion anonyme à Firebase...");
     const userCredential = await signInAnonymously(auth);
+    console.log("Connecté anonymement :", userCredential.user.uid);
+    return userCredential.user;
+  } catch (error: any) {
+    console.error("ERREUR CRITIQUE FIREBASE AUTH:", error.code, error.message);
+    if (error.code === 'auth/network-request-failed') {
+      console.warn("Détail : Le périphérique ne semble pas avoir d'accès internet ou les serveurs Firebase sont bloqués.");
+    }
+    return null;
+  }
+};
+
+/**
+ * Connecte l'utilisateur avec Google (Firebase Web Flow / Expo Proxy)
+ * Note: Nécessite la configuration de l'ID Client Google dans la console Firebase.
+ */
+export const loginWithGoogle = async (idToken: string) => {
+  try {
+    const credential = GoogleAuthProvider.credential(idToken);
+    const userCredential = await signInWithCredential(auth, credential);
     return userCredential.user;
   } catch (error) {
-    console.error("Error signing in anonymously:", error);
+    console.error("Error signing in with Google:", error);
     return null;
   }
 };
@@ -52,6 +75,11 @@ const cleanData = (obj: any): any => {
 
 export const saveUserSettings = async (uid: string, settings: any) => {
   try {
+    // 1. S'assurer que le document racine existe pour la liste admin
+    const userRoot = doc(db, 'users', uid);
+    await setDoc(userRoot, { lastSeen: new Date().toISOString() }, { merge: true });
+
+    // 2. Sauvegarder les réglages
     const docRef = doc(db, 'users', uid, 'private', 'settings');
     await setDoc(docRef, cleanData(settings), { merge: true });
   } catch (error) {
@@ -72,6 +100,11 @@ export const getUserSettings = async (uid: string) => {
 
 export const saveUserStats = async (uid: string, stats: any) => {
   try {
+    // 1. Racine
+    const userRoot = doc(db, 'users', uid);
+    await setDoc(userRoot, { lastSeen: new Date().toISOString() }, { merge: true });
+
+    // 2. Stats
     const docRef = doc(db, 'users', uid, 'private', 'stats');
     await setDoc(docRef, cleanData(stats), { merge: true });
   } catch (error) {

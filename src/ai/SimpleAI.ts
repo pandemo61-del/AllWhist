@@ -283,6 +283,7 @@ export function choisirEnchere(
   variante: VariantConfig,
   meilleureEnchere: ContratJoue | null,
   niveau: NiveauIA,
+  joueurId: number,
   preferenceCouleurs?: Couleur[],
 ): DecisionEnchere {
   if (variante.id === 'whist-gand') {
@@ -327,7 +328,7 @@ export function choisirEnchere(
   const contratsDisponibles = variante.contrats.filter(c =>
     c.id !== 'passe' &&
     c.priorite > (meilleureEnchere?.priorite ?? 0) &&
-    (!c.disponibleSi || c.disponibleSi(main, meilleureEnchere as any))
+    (!c.disponibleSi || c.disponibleSi(main, meilleureEnchere as any, joueurId))
   );
 
   const nbGrossesCartes = main.filter(c => c.valeur >= 11).length;

@@ -18,7 +18,7 @@ export interface ContratConfig {
   sanAtout: boolean;        // misère → pas d'atout
   cartesVisibles: boolean;  // misère ouverte → cartes abattues
   priorite: number;         // hiérarchie des enchères
-  disponibleSi?: (main: Carte[], enchereActuelle?: ContratConfig | null) => boolean;
+  disponibleSi?: (main: Carte[], enchereActuelle?: ContratJoue | null, joueurId?: number) => boolean;
 }
 
 export interface VariantConfig {
