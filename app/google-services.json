@@ -1,0 +1,39 @@
+{
+  "project_info": {
+    "project_number": "814265216795",
+    "project_id": "allwhist-61182",
+    "storage_bucket": "allwhist-61182.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:814265216795:android:52f3a66acbb1d3f745edbe",
+        "android_client_info": {
+          "package_name": "com.allwhist.app"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "814265216795-qn9tedr59g9vh2piktdm4a2vjhh7f9t8.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCkctxQI4JListDFRo_hgwccy9I3bP8u8A"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "814265216795-qn9tedr59g9vh2piktdm4a2vjhh7f9t8.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

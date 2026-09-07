@@ -101,7 +101,7 @@
             </div>
 
             <!-- Analysis Table -->
-            <div class="bg-white rounded-2xl shadow-md border border-gray-200 overflow-hidden">
+            <div class="bg-white rounded-2xl shadow-md border border-gray-200 overflow-hidden mb-8">
                 <div class="bg-slate-800 text-white px-6 py-4 pli-row text-[10px] font-black uppercase tracking-widest">
                     <div class="text-center">#</div>
                     <div class="text-center">Total</div>
@@ -121,6 +121,14 @@
                         <p>Chargement des plis...</p>
                     </div>
                 </div>
+            </div>
+
+            <!-- Debug Data -->
+            <div class="mt-12 border-t pt-8">
+                <button onclick="document.getElementById('debug-box').classList.toggle('hidden')" class="text-xs text-slate-400 hover:text-slate-600 font-bold uppercase tracking-widest">
+                    <i class="fas fa-bug mr-1"></i> Voir les données brutes
+                </button>
+                <pre id="debug-box" class="hidden mt-4 bg-slate-900 text-emerald-400 p-6 rounded-xl text-[10px] font-mono overflow-auto max-h-[400px]"></pre>
             </div>
         </main>
     </div>
@@ -161,22 +169,32 @@
                 authStatus.innerText = `Connecté: ${user.email}`;
                 authStatus.className = 'text-sm font-medium px-4 py-2 rounded-full bg-green-100 text-green-700';
                 if (gameId) loadGameDetail(gameId);
+                else {
+                    document.getElementById('tricks-list').innerHTML = '<div class="p-10 text-center text-rose-500 font-bold">ID de partie manquant dans l\'URL</div>';
+                }
             } else {
                 window.location.href = 'index.html';
             }
         });
 
         async function loadGameDetail(id) {
+            console.log("Loading game:", id);
             try {
                 const snap = await getDoc(doc(db, 'games', id));
-                if (!snap.exists()) return alert("Partie introuvable");
+                if (!snap.exists()) {
+                    document.getElementById('tricks-list').innerHTML = '<div class="p-10 text-center text-rose-500 font-bold">Partie introuvable dans la base de données</div>';
+                    return;
+                }
                 const data = snap.data();
+                console.log("Game data received:", data);
+
+                document.getElementById('debug-box').innerText = JSON.stringify(data, null, 2);
 
                 renderGameInfo(data);
                 renderTricks(data);
             } catch (error) {
-                console.error(error);
-                alert("Erreur de chargement");
+                console.error("Firestore error:", error);
+                document.getElementById('tricks-list').innerHTML = '<div class="p-10 text-center text-rose-500 font-bold">Erreur de chargement: ' + error.message + '</div>';
             }
         }
 
@@ -184,7 +202,7 @@
             const container = document.getElementById('game-info');
             const res = data.resultat || {};
             const cards = [
-                { label: 'Variante', value: data.varianteId, color: 'text-blue-600' },
+                { label: 'Variante', value: data.varianteId || 'N/A', color: 'text-blue-600' },
                 { label: 'Contrat', value: data.contrat?.nom || 'Passe', color: 'text-emerald-600' },
                 { label: 'Objectif', value: `${data.contrat?.plisObjectif || 0} plis`, color: 'text-amber-600' },
                 { label: 'Résultat', value: res.reussite ? 'Réussi' : 'Chuté', color: res.reussite ? 'text-green-600' : 'text-rose-600' }
@@ -200,19 +218,28 @@
 
         function renderTricks(data) {
             const list = document.getElementById('tricks-list');
-            const h = [0,1,2,3].map(i => document.getElementById(`h${i}`));
+            if (!list) return;
 
             const bidderId = data.contrat?.joueurId;
             const partnerId = data.contrat?.partenaireId;
             const teamIds = [bidderId, partnerId].filter(id => id !== undefined);
 
             // Headers
-            data.donne.forEach(j => {
-                const isTeam = teamIds.includes(j.joueurId);
+            const players = data.donne || [0, 1, 2, 3].map(i => ({ joueurId: i, nom: `J${i+1}` }));
+            players.forEach(j => {
                 const el = document.getElementById(`h${j.joueurId}`);
-                if (el) el.innerHTML = `${j.joueurId === 0 ? 'VOUS' : j.nom.toUpperCase()} ${j.joueurId === bidderId ? '🎯' : (j.joueurId === partnerId ? '🤝' : '')}`;
-                if (el && isTeam) el.className = "text-emerald-500 font-black";
+                if (el) {
+                    const isBidder = j.joueurId === bidderId;
+                    const isPartner = j.joueurId === partnerId;
+                    el.innerHTML = `${j.joueurId === 0 ? 'VOUS' : (j.nom ? j.nom.toUpperCase() : 'IA')} ${isBidder ? '🎯' : (isPartner ? '🤝' : '')}`;
+                    if (isBidder || isPartner) el.className = "text-emerald-500 font-black";
+                }
             });
+
+            if (!data.plis || data.plis.length === 0) {
+                list.innerHTML = '<div class="p-10 text-center text-slate-400 italic">Aucun pli enregistré</div>';
+                return;
+            }
 
             let teamTotal = 0;
             list.innerHTML = data.plis.map((pli, idx) => {
@@ -227,7 +254,7 @@
                         <div class="flex gap-1 justify-center">
                             ${errors.map(e => `
                                 <div class="expert-icon ${e.type === 'error' ? 'expert-icon-error' : 'expert-icon-warn'}"
-                                     onclick="window.showTip('${e.type}', '${e.titre}', '${e.message.replace(/'/g, "\\'")}')">
+                                     onclick="window.showTip('${e.type}', '${e.titre || 'Avis'}', '${(e.message || e.description || '').replace(/'/g, "\\'")}')">
                                     ${e.type === 'error' ? '!' : '?'}
                                 </div>
                             `).join('')}

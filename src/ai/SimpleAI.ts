@@ -346,13 +346,31 @@ export function choisirEnchere(
     contratChoisi = contratsDisponibles.find(c => c.id === 'solo') ?? null;
   } else if (peutMisere) {
     contratChoisi = contratsDisponibles.find(c => c.id === 'misere' || c.id === 'misere_ouverte') ?? null;
-  } else if (force >= seuils.demande) {
-    contratChoisi = contratsDisponibles.find(c => c.id === 'demande') ?? null;
+  } else if (meilleureEnchere?.id === 'propose') {
+    // Cas spécial Emballage : l'IA regarde si elle a du jeu dans la couleur proposée
+    const colProposee = meilleureEnchere.atout!;
+    const nbAtoutsCol = cartesParCouleur(main, colProposee).length;
+    const forceCol = cartesParCouleur(main, colProposee).reduce((acc, c) => acc + (c.valeur >= 11 ? 1 : 0), 0);
+
+    // Si l'IA a au moins 3 atouts OU 2 atouts dont un gros, elle emballe
+    if (nbAtoutsCol >= 3 || (nbAtoutsCol >= 2 && forceCol >= 1)) {
+        contratChoisi = contratsDisponibles.find(c => c.id === 'emballe') ?? null;
+    }
+  } else if (force >= (seuils.demande - 2)) { // L'IA est plus encline à proposer pour trouver un partenaire
+    contratChoisi = contratsDisponibles.find(c => c.id === 'propose') ?? null;
   }
 
   if (!contratChoisi) return { action: 'passe' };
 
   let asPartenaire: string | undefined;
+  if (contratChoisi.id === 'emballe' && meilleureEnchere?.id === 'propose') {
+    return {
+      action: 'enchere',
+      contratId: 'emballe',
+      atout: meilleureEnchere.atout,
+    };
+  }
+
   if (contratChoisi.partenaire) {
     const asDispo = main.filter(c => c.valeur === 14);
     const asAbsent = [Couleur.PIQUE, Couleur.COEUR, Couleur.CARREAU, Couleur.TREFLE]

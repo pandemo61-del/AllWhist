@@ -91,9 +91,9 @@ export const BidPanel: React.FC<BidPanelProps> = ({
 
     const currentPrio = meilleureEnchere?.priorite ?? -1;
 
-    // "Je propose" est disponible si aucune enchère supérieure n'a été faite
+    // "Je propose" est disponible si aucune enchère n'a été faite (priorité -1 ou 0)
     if (c.id === 'propose') {
-      return currentPrio < 1;
+      return currentPrio <= 0;
     }
 
     // "J'emballe" est disponible uniquement si la meilleure enchère est "Je propose"
