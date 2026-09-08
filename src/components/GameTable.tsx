@@ -91,7 +91,7 @@ export const GameTable: React.FC<any> = ({
               />
             </View>
 
-            <View style={[styles.middleRow, { flex: 4 }]}>
+            <View style={[styles.middleRow, { flex: 5 }]}>
               <Player
                 j={joueurs[1]}
                 active={tourDeJoueur === 1}
@@ -305,8 +305,6 @@ const styles = StyleSheet.create({
   },
   pCard: {
     position: 'absolute',
-    top: '50%',
-    left: '50%',
     marginLeft: -normalize(45),
     marginTop: -normalize(64),
     ...Shadows.card
