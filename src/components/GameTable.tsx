@@ -69,8 +69,11 @@ export const GameTable: React.FC<any> = ({
 
       <View style={styles.arena}>
         {isBidding ? (
-          <View style={styles.biddingContainer}>
-            {centerContent}
+          /* Enchères : On cache les adversaires pour donner tout l'espace au centre */
+          <View style={{ flex: 1, justifyContent: 'center' }}>
+            <View style={styles.biddingContainer}>
+              {centerContent}
+            </View>
           </View>
         ) : (
           <>
@@ -88,7 +91,7 @@ export const GameTable: React.FC<any> = ({
               />
             </View>
 
-            <View style={styles.middleRow}>
+            <View style={[styles.middleRow, { flex: 4 }]}>
               <Player
                 j={joueurs[1]}
                 active={tourDeJoueur === 1}
@@ -100,8 +103,22 @@ export const GameTable: React.FC<any> = ({
                 isDealer={joueurs[1].id === donneurId}
                 phase={phase}
                 cardsCount={phase === 'distribution' ? cardsReceived[1] : undefined}
+                compact={phase === 'jeu' || phase === 'fin_pli'}
               />
-              <View style={styles.pliZone}>{centerContent}</View>
+
+              <View style={styles.pliZone}>
+                <View style={styles.tableCenter} />
+
+                {/* Zone de pli — Maintenant parfaitement centrée dans pliZone */}
+                <View style={styles.pliOverlayInternal} pointerEvents="none">
+                  {(phase === 'jeu' || phase === 'fin_pli') && pliEnCours.cartesJouees.map((cp: CartePosee) => (
+                    <PlayedCard key={cp.joueurId} cp={cp} winner={pliEnCours.gagnantId} />
+                  ))}
+                </View>
+
+                {centerContent}
+              </View>
+
               <Player
                 j={joueurs[3]}
                 active={tourDeJoueur === 3}
@@ -113,6 +130,7 @@ export const GameTable: React.FC<any> = ({
                 isDealer={joueurs[3].id === donneurId}
                 phase={phase}
                 cardsCount={phase === 'distribution' ? cardsReceived[3] : undefined}
+                compact={phase === 'jeu' || phase === 'fin_pli'}
               />
             </View>
           </>
@@ -131,6 +149,7 @@ export const GameTable: React.FC<any> = ({
               isDealer={joueurs[0].id === donneurId}
               phase={phase}
               cardsCount={phase === 'distribution' ? cardsReceived[0] : undefined}
+              compact={phase === 'jeu' || phase === 'fin_pli'}
             />
           )}
           <View style={styles.handContainer}>
@@ -142,15 +161,6 @@ export const GameTable: React.FC<any> = ({
         </View>
       </View>
 
-      {/* Cartes sur la table (Overlay) */}
-      {!isBidding && phase !== 'distribution' && (
-        <View style={styles.overlay} pointerEvents="none">
-          {pliEnCours.cartesJouees.map((cp: CartePosee, i: number) => (
-            <PlayedCard key={i} cp={cp} winner={pliEnCours.gagnantId} />
-          ))}
-        </View>
-      )}
-
       {/* Animation de distribution */}
       {phase === 'distribution' && (
         <DistributionAnimation onCardLanded={handleCardLanded} />
@@ -160,15 +170,16 @@ export const GameTable: React.FC<any> = ({
 };
 
 const PlayedCard = ({ cp, winner }: { cp: CartePosee, winner?: number }) => {
-  const target = [{ x: 0, y: 60 }, { x: -75, y: 0 }, { x: 0, y: -60 }, { x: 75, y: 0 }][cp.joueurId];
-  const start = [{ x: 0, y: 200 }, { x: -150, y: 0 }, { x: 0, y: -200 }, { x: 150, y: 0 }][cp.joueurId];
+  // Les cibles sont maintenant relatives au centre exact de la table
+  const target = [{ x: 0, y: 65 }, { x: -80, y: 0 }, { x: 0, y: -65 }, { x: 80, y: 0 }][cp.joueurId];
+  const start = [{ x: 0, y: 200 }, { x: -200, y: 0 }, { x: 0, y: -200 }, { x: 200, y: 0 }][cp.joueurId];
   const anim = useRef(new Animated.ValueXY(start)).current;
   const fade = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     Animated.parallel([
-      Animated.timing(fade, { toValue: 1, duration: 200, useNativeDriver: true }),
-      Animated.spring(anim, { toValue: target, friction: 8, useNativeDriver: true }),
+      Animated.timing(fade, { toValue: 1, duration: 250, useNativeDriver: true }),
+      Animated.spring(anim, { toValue: target, friction: 7, tension: 40, useNativeDriver: true }),
     ]).start();
   }, []);
 
@@ -177,7 +188,7 @@ const PlayedCard = ({ cp, winner }: { cp: CartePosee, winner?: number }) => {
       Animated.sequence([
         Animated.delay(1200),
         Animated.parallel([
-          Animated.timing(anim, { toValue: [{ x: 0, y: 60 }, { x: -75, y: 0 }, { x: 0, y: -60 }, { x: 75, y: 0 }][winner], duration: 400, useNativeDriver: true }),
+          Animated.timing(anim, { toValue: [{ x: 0, y: 55 }, { x: -65, y: 0 }, { x: 0, y: -55 }, { x: 65, y: 0 }][winner], duration: 400, useNativeDriver: true }),
           Animated.timing(fade, { toValue: 0, duration: 400, useNativeDriver: true }),
         ])
       ]).start();
@@ -191,23 +202,36 @@ const PlayedCard = ({ cp, winner }: { cp: CartePosee, winner?: number }) => {
   );
 };
 
-const Player = ({ j, active, plis, eq, ann, part, orient = 'horizontal', hum, obj, isDealer, phase, cardsCount }: any) => {
+const Player = ({ j, active, plis, eq, ann, part, orient = 'horizontal', hum, obj, isDealer, phase, cardsCount, compact }: any) => {
   const { t } = useTranslation();
   const color = eq === 'A' ? Colors.primary : '#E24B4A';
   const nbCartes = cardsCount !== undefined ? cardsCount : j.main.length;
 
   return (
-    <View style={[styles.pSlot, active && styles.pActive, eq && { borderColor: color, borderWidth: 2 }]}>
+    <View style={[
+      styles.pSlot,
+      active && styles.pActive,
+      eq && { borderColor: color, borderWidth: 2 },
+      compact && styles.pSlotCompact
+    ]}>
       {isDealer && <View style={styles.dealerBadge}><Text style={styles.dealerText}>D</Text></View>}
-      {!hum && nbCartes > 0 && <HandBack nbCartes={nbCartes} orientation={orient} />}
-      <View style={styles.pInfo}>
-        <View style={styles.pRow}>
-          <Text style={[styles.pName, active && { color: Colors.primary }]}>{j.nom}{hum ? ' (Vous)' : ''}</Text>
-          {(ann || part) && <Text style={{ fontSize: 12 }}>{ann ? '🎯' : '🤝'}</Text>}
+      {!hum && nbCartes > 0 && (
+        <View style={compact ? { transform: [{ scale: 0.7 }] } : null}>
+          <HandBack nbCartes={nbCartes} orientation={orient} />
         </View>
-        <Text style={[styles.pScore, hum && styles.pScoreHum]}>
-          {active && !hum ? t('common.thinking') : `${plis}${obj ? `/${obj}` : ''} pli${plis > 1 ? 's' : ''}`}
-        </Text>
+      )}
+      <View style={[styles.pInfo, compact && { marginTop: 0 }]}>
+        <View style={styles.pRow}>
+          <Text style={[styles.pName, active && { color: Colors.primary }, compact && { fontSize: 10 }]}>
+            {j.nom}{hum ? ' (Vous)' : ''}
+          </Text>
+          {(ann || part) && <Text style={{ fontSize: compact ? 10 : 12 }}>{ann ? '🎯' : '🤝'}</Text>}
+        </View>
+        {!compact && (
+          <Text style={[styles.pScore, hum && styles.pScoreHum]}>
+            {active && !hum ? t('common.thinking') : `${plis}${obj ? `/${obj}` : ''} pli${plis > 1 ? 's' : ''}`}
+          </Text>
+        )}
       </View>
     </View>
   );
@@ -220,14 +244,44 @@ const styles = StyleSheet.create({
   bContrat: { backgroundColor: '#146e52' },
   bTxt: { fontSize: 11, color: '#455a64', fontWeight: 'bold' },
   bTxtW: { fontSize: 11, color: '#fff', fontWeight: 'bold' },
-  arena: { flex: 1, padding: 10, justifyContent: 'space-between' },
+  arena: { flex: 1, padding: 5, justifyContent: 'space-between' },
   posNord: { alignItems: 'center', height: 80 },
-  middleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', flex: 1 },
-  pliZone: { flex: 1 },
-  biddingContainer: { flex: 1, width: '100%', marginBottom: 10 },
+  middleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  pliZone: { flex: 1, height: '100%', justifyContent: 'center', alignItems: 'center', position: 'relative', overflow: 'visible' },
+  pliOverlayInternal: {
+    ...StyleSheet.absoluteFillObject,
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 100,
+    overflow: 'visible',
+  },
+  tableCenter: {
+    position: 'absolute',
+    width: SW * 0.5,
+    height: SW * 0.5,
+    borderRadius: SW * 0.25,
+    backgroundColor: 'rgba(0,0,0,0.03)',
+    borderWidth: 1,
+    borderColor: 'rgba(0,0,0,0.05)',
+  },
+  biddingContainer: { flex: 1, width: '100%' },
+  biddingWrapper: { flex: 1, position: 'relative', width: '100%' },
+  sidePlayerLeft: {
+    position: 'absolute',
+    left: -10,
+    top: '30%',
+    zIndex: 10,
+  },
+  sidePlayerRight: {
+    position: 'absolute',
+    right: -10,
+    top: '30%',
+    zIndex: 10,
+  },
   sudArea: { alignItems: 'center', width: SW },
   handContainer: { width: SW, height: normalize(150), marginTop: 5 },
   pSlot: { backgroundColor: 'rgba(255,255,255,0.8)', borderRadius: 10, padding: 6, alignItems: 'center', minWidth: 80, position: 'relative' },
+  pSlotCompact: { minWidth: 60, padding: 2 },
   pActive: { backgroundColor: '#fff', elevation: 6, shadowOpacity: 0.2 },
   pEq: { position: 'absolute', top: -10, left: '50%', marginLeft: -10, width: 20, height: 20, borderRadius: 10, justifyContent: 'center', alignItems: 'center' },
   pEqT: { color: '#fff', fontSize: 10, fontWeight: 'bold' },
@@ -237,7 +291,26 @@ const styles = StyleSheet.create({
   pScore: { fontSize: 10, color: '#455a64', fontWeight: 'bold' },
   pScoreHum: { fontSize: 14, color: Colors.primary },
   overlay: { ...StyleSheet.absoluteFillObject, justifyContent: 'center', alignItems: 'center', zIndex: 50 },
-  pCard: { position: 'absolute', ...Shadows.card },
+  pliOverlay: { position: 'absolute', ...StyleSheet.absoluteFillObject, justifyContent: 'center', alignItems: 'center', zIndex: 100, overflow: 'visible' },
+  pliOverlayGlobal: {
+    position: 'absolute',
+    top: '30%', // Centré sur la zone de jeu
+    left: 0,
+    right: 0,
+    bottom: '25%', // Laisse la place pour la main
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 1000, // Passe au-dessus de tout
+    pointerEvents: 'none',
+  },
+  pCard: {
+    position: 'absolute',
+    top: '50%',
+    left: '50%',
+    marginLeft: -normalize(45),
+    marginTop: -normalize(64),
+    ...Shadows.card
+  },
   dealerBadge: {
     position: 'absolute',
     top: -12,

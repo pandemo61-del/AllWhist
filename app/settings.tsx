@@ -20,6 +20,7 @@ export default function SettingsScreen() {
     ordreValeur, setOrdreValeur,
     ordreCouleurs, setOrdreCouleurs,
     autoJeu, setAutoJeu,
+    autoEnchere, setAutoEnchere,
     langue, setLangue,
     vibration, setVibration,
     son, setSon,
@@ -167,6 +168,24 @@ export default function SettingsScreen() {
                 onPress={() => setAutoJeu(false)}
               >
                 <Text style={[styles.btnTexte, autoJeu === false && styles.btnTexteActive]}>{t('common.no') || 'Non'}</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          <View style={styles.option}>
+            <Text style={styles.optionLabel}>Enchère automatique</Text>
+            <View style={styles.btnGroup}>
+              <TouchableOpacity
+                style={[styles.btn, autoEnchere === true && styles.btnActive]}
+                onPress={() => setAutoEnchere(true)}
+              >
+                <Text style={[styles.btnTexte, autoEnchere === true && styles.btnTexteActive]}>{t('common.yes') || 'Oui'}</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.btn, autoEnchere === false && styles.btnActive]}
+                onPress={() => setAutoEnchere(false)}
+              >
+                <Text style={[styles.btnTexte, autoEnchere === false && styles.btnTexteActive]}>{t('common.no') || 'Non'}</Text>
               </TouchableOpacity>
             </View>
           </View>

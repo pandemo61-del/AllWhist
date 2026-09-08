@@ -9,16 +9,17 @@ const { width: SW, height: SH } = Dimensions.get('window');
  * Schémas de distribution officiels par variante.
  */
 const PATTERNS: Record<string, number[]> = {
-  'whist-gand': [3, 3, 3, 3, 1],
-  'solo-whist': [3, 3, 3, 3, 1],
-  'boston-whist': [4, 4, 5],
-  'bid-whist': [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
-  'whist-classique': [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+  'whist-gand': [4, 3, 3, 3],
+  'solo-whist': [4, 3, 3, 3],
+  'boston-whist': [4, 3, 3, 3],
+  'bid-whist': [4, 3, 3, 3],
+  'whist-classique': [4, 3, 3, 3],
 };
 
 export const DistributionAnimation: React.FC<{ onCardLanded: (playerId: number) => void }> = ({ onCardLanded }) => {
   const { finaliserDistribution, donneur, varianteId } = useGameStore();
   const [cards, setCards] = useState<any[]>([]);
+  const [deckCount, setDeckCount] = useState(52);
 
   const targets = [
     { x: 0, y: SH * 0.35 },   // Sud (Humain)
@@ -28,7 +29,8 @@ export const DistributionAnimation: React.FC<{ onCardLanded: (playerId: number) 
   ];
 
   const startPos = targets[donneur];
-  const pattern = PATTERNS[varianteId] || [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1];
+  const pattern = PATTERNS[varianteId] || [4, 3, 3, 3];
+  const timers = useRef<NodeJS.Timeout[]>([]);
 
   useEffect(() => {
     let cardCount = 0;
@@ -36,9 +38,9 @@ export const DistributionAnimation: React.FC<{ onCardLanded: (playerId: number) 
     const newCards: any[] = [];
 
     // Vitesse adaptée pour les paquets
-    const cardInterval = 60;   // Temps entre cartes d'un même paquet
-    const playerPause = 120;   // Pause entre deux joueurs
-    const roundPause = 300;    // Pause entre deux tours de table
+    const cardInterval = 50;   // Temps entre cartes d'un même paquet
+    const playerPause = 100;   // Pause entre deux joueurs
+    const roundPause = 250;    // Pause entre deux tours de table
 
     pattern.forEach((batchSize) => {
       for (let p = 0; p < 4; p++) {
@@ -46,14 +48,22 @@ export const DistributionAnimation: React.FC<{ onCardLanded: (playerId: number) 
         const targetPos = targets[targetPlayerId];
 
         for (let b = 0; b < batchSize; b++) {
+          const delay = currentDelay;
           newCards.push({
             id: cardCount,
             start: startPos,
             target: targetPos,
             targetPlayerId,
-            delay: currentDelay,
+            delay,
             indexInBatch: b,
           });
+
+          // Diminuer le paquet visuel au moment où la carte part
+          const t = setTimeout(() => {
+            setDeckCount(prev => prev - 1);
+          }, delay);
+          timers.current.push(t);
+
           cardCount++;
           currentDelay += cardInterval;
         }
@@ -65,13 +75,20 @@ export const DistributionAnimation: React.FC<{ onCardLanded: (playerId: number) 
     setCards(newCards);
 
     const totalDuration = currentDelay + 800;
-    const timer = setTimeout(finaliserDistribution, totalDuration);
+    const finalTimer = setTimeout(finaliserDistribution, totalDuration);
+    timers.current.push(finalTimer);
 
-    return () => clearTimeout(timer);
+    return () => {
+      timers.current.forEach(clearTimeout);
+      timers.current = [];
+    };
   }, [varianteId, donneur]);
 
   return (
     <View style={StyleSheet.absoluteFill} pointerEvents="none">
+      {/* Affichage du paquet chez le donneur */}
+      <DeckVisual pos={startPos} count={deckCount} />
+
       {cards.map((c) => (
         <SingleMovingCard
           key={c.id}
@@ -87,6 +104,38 @@ export const DistributionAnimation: React.FC<{ onCardLanded: (playerId: number) 
   );
 };
 
+const DeckVisual = ({ pos, count }: { pos: { x: number, y: number }, count: number }) => {
+  if (count <= 0) return null;
+  // On affiche quelques cartes empilées pour donner un effet de volume
+  const visibleStacks = Math.min(Math.ceil(count / 4), 10);
+
+  return (
+    <View style={[
+      styles.deckContainer,
+      {
+        transform: [
+          { translateX: pos.x },
+          { translateY: pos.y },
+          { scale: 1.6 } // Grosses cartes chez le donneur
+        ]
+      }
+    ]}>
+      {Array.from({ length: visibleStacks }).map((_, i) => (
+        <View key={i} style={[
+          styles.deckCard,
+          {
+            left: -17 + (i * 0.4),
+            top: -23 - (i * 0.4),
+            zIndex: 100 + i
+          }
+        ]}>
+          <CardBack />
+        </View>
+      ))}
+    </View>
+  );
+};
+
 const SingleMovingCard = ({ start, target, targetPlayerId, delay, indexInBatch, onLanded }: any) => {
   const anim = useRef(new Animated.Value(0)).current;
   const [visible, setVisible] = useState(false);
@@ -96,11 +145,10 @@ const SingleMovingCard = ({ start, target, targetPlayerId, delay, indexInBatch, 
       setVisible(true);
       Animated.timing(anim, {
         toValue: 1,
-        duration: 750, // Animation plus longue pour apprécier l'effet de vol
-        easing: Easing.bezier(0.25, 0.1, 0.25, 1),
+        duration: 650, // Animation fluide
+        easing: Easing.out(Easing.quad),
         useNativeDriver: true,
       }).start(() => {
-        // Trigger callback when animation is done
         onLanded(targetPlayerId);
       });
     }, delay);
@@ -119,20 +167,19 @@ const SingleMovingCard = ({ start, target, targetPlayerId, delay, indexInBatch, 
     outputRange: [start.y, target.y],
   });
 
-  // EFFET DE MONTÉE ET DESCENTE (Impression de 3D / Grandissant au milieu)
-  // La carte commence petite au donneur, grossit au milieu du vol (monte), puis rétrécit (descend)
+  // DIMINUTION DE LA TAILLE : Commence à 1.6 (taille paquet) et finit à 0.6 (taille main)
   const scale = anim.interpolate({
-    inputRange: [0, 0.45, 1],
-    outputRange: [0.6, 1.6, 0.5], // Monte très haut (1.6) puis descend
+    inputRange: [0, 1],
+    outputRange: [1.6, 0.6],
   });
 
   const rotate = anim.interpolate({
     inputRange: [0, 1],
-    outputRange: ['0deg', (indexInBatch * 6 - 12) + 'deg'], // S'étale légèrement dans la main
+    outputRange: ['0deg', (indexInBatch * 4 - 6) + 'deg'],
   });
 
   const opacity = anim.interpolate({
-    inputRange: [0, 0.1, 0.85, 1],
+    inputRange: [0, 0.05, 0.9, 1],
     outputRange: [0, 1, 1, 0],
   });
 
@@ -162,5 +209,14 @@ const styles = StyleSheet.create({
     marginLeft: -17,
     marginTop: -23,
     zIndex: 200,
+  },
+  deckContainer: {
+    position: 'absolute',
+    top: '50%',
+    left: '50%',
+    zIndex: 150,
+  },
+  deckCard: {
+    position: 'absolute',
   }
 });

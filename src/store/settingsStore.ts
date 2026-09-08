@@ -13,6 +13,7 @@ interface SettingsState {
   ordreValeur: OrdreValeur;
   directionTri: DirectionTri;
   autoJeu: boolean;
+  autoEnchere: boolean;
   langue: Langue;
   hasSeenOnboarding: boolean;
   vibration: boolean;
@@ -25,6 +26,7 @@ interface SettingsState {
   setOrdreValeur: (ordre: OrdreValeur) => void;
   setDirectionTri: (direction: DirectionTri) => void;
   setAutoJeu: (auto: boolean) => void;
+  setAutoEnchere: (auto: boolean) => void;
   setLangue: (langue: Langue) => void;
   setHasSeenOnboarding: (val: boolean) => void;
   setVibration: (val: boolean) => void;
@@ -49,6 +51,7 @@ export const useSettingsStore = create<SettingsState>()(
       ordreValeur: 'croissant',
       directionTri: 'gauche_droite',
       autoJeu: false,
+      autoEnchere: false,
       langue: 'fr',
       hasSeenOnboarding: false,
       vibration: true,
@@ -61,6 +64,7 @@ export const useSettingsStore = create<SettingsState>()(
       setOrdreValeur: (ordre) => set({ ordreValeur: ordre }),
       setDirectionTri: (direction) => set({ directionTri: direction }),
       setAutoJeu: (auto) => set({ autoJeu: auto }),
+      setAutoEnchere: (auto) => set({ autoEnchere: auto }),
       setLangue: (langue) => set({ langue }),
       setHasSeenOnboarding: (val) => set({ hasSeenOnboarding: val }),
       setVibration: (val) => set({ vibration: val }),

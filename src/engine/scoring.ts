@@ -35,6 +35,7 @@ export function evaluerReussite(
 export function calculerScoreGenerique(
   contrat: ContratJoue,
   plisParJoueur: Record<number, number>,
+  _joueurs?: any[],
   nbJoueurs = 4,
 ): ResultatManche {
   const reussite = evaluerReussite(contrat, plisParJoueur);
@@ -90,6 +91,7 @@ export function calculerScoreGenerique(
  */
 export function calculerScoreClassique(
   plisParJoueur: Record<number, number>,
+  _joueurs?: any[],
 ): ResultatManche {
   const plisEquipeA = (plisParJoueur[0] ?? 0) + (plisParJoueur[2] ?? 0);
   const plisEquipeB = (plisParJoueur[1] ?? 0) + (plisParJoueur[3] ?? 0);
@@ -121,6 +123,7 @@ const POINTS_BOSTON: Record<string, { reussite: number; echec: number }> = {
 export function calculerScoreBoston(
   contrat: ContratJoue,
   plisParJoueur: Record<number, number>,
+  joueurs?: Joueur[]
 ): ResultatManche {
   const pts = POINTS_BOSTON[contrat.id] ?? { reussite: contrat.pointsReussite, echec: contrat.pointsEchec };
   const reussite = evaluerReussite(contrat, plisParJoueur);
@@ -128,9 +131,29 @@ export function calculerScoreBoston(
   const defenseIds = joueurIds.filter(id => id !== contrat.joueurId);
   const delta: Record<number, number> = {};
 
+  const plisJoueur = plisParJoueur[contrat.joueurId] ?? 0;
+
+  // Calcul des Surplis (Overtricks) : +5 jetons par pli supplémentaire
+  let bonusSurplis = 0;
+  if (reussite && contrat.id !== 'misere' && contrat.id !== 'misere_ouverte' && contrat.id !== 'piccolo') {
+    bonusSurplis = (plisJoueur - contrat.plisObjectif) * 5;
+  }
+
+  // Bonus Honneurs : +10 jetons pour 3 honneurs, +20 pour 4
+  let bonusHonneurs = 0;
+  if (joueurs && contrat.atout) {
+    const main = joueurs.find(j => j.id === contrat.joueurId)?.main || [];
+    const honneurs = [11, 12, 13, 14]; // V, D, R, A
+    const nbHonneurs = main.filter(c => c.couleur === contrat.atout && honneurs.includes(c.valeur)).length;
+    if (nbHonneurs === 3) bonusHonneurs = 10;
+    else if (nbHonneurs === 4) bonusHonneurs = 20;
+  }
+
+  const gainParAdversaire = pts.reussite + bonusSurplis + bonusHonneurs;
+
   if (reussite) {
-    delta[contrat.joueurId] = pts.reussite * 3; // gagne 3× (des 3 adversaires)
-    for (const id of defenseIds) delta[id] = -pts.reussite;
+    delta[contrat.joueurId] = gainParAdversaire * 3;
+    for (const id of defenseIds) delta[id] = -gainParAdversaire;
   } else {
     delta[contrat.joueurId] = -pts.echec * 3;
     for (const id of defenseIds) delta[id] = pts.echec;
@@ -138,11 +161,11 @@ export function calculerScoreBoston(
 
   return {
     reussite,
-    plisJoueurEtPartenaire: plisParJoueur[contrat.joueurId] ?? 0,
+    plisJoueurEtPartenaire: plisJoueur,
     deltaScores: delta,
     details: reussite
-      ? `✓ ${contrat.nom} réussi (+${pts.reussite * 3} pts)`
-      : `✗ ${contrat.nom} chute (−${pts.echec * 3} pts)`,
+      ? `✓ ${contrat.nom} réussi (+${delta[contrat.joueurId]} pts)`
+      : `✗ ${contrat.nom} chute (−${Math.abs(delta[contrat.joueurId])} pts)`,
   };
 }
 
@@ -158,51 +181,57 @@ export function calculerScoreSolo(
   const delta: Record<number, number> = {};
   const joueurIds = Object.keys(plisParJoueur).map(Number);
 
-  // Barème officiel en unités (ex: 1, 2, 3, 4, 6)
-  // On multiplie par 10 pour l'affichage
   const bareme: Record<string, number> = {
     proposal: 10,
-    solo: 20,
-    misere: 30,
-    abondance: 40,
-    misere_ouverte: 60,
-    abondance_declaree: 100,
+    solo: 10,
+    misere: 20,
+    abondance: 30,
+    misere_ouverte: 40,
+    abondance_declaree: 60,
   };
 
-  const points = bareme[contrat.id] ?? 10;
-
-  if (contrat.id === 'proposal') {
-    // Jeu à deux : les 2 gagnants reçoivent 'points' des 2 perdants
-    const gagnants = [contrat.joueurId, contrat.partenaireId!];
-    const perdants = joueurIds.filter(id => !gagnants.includes(id));
-
-    if (reussite) {
-      gagnants.forEach(id => delta[id] = points);
-      perdants.forEach(id => delta[id] = -points);
-    } else {
-      gagnants.forEach(id => delta[id] = -points);
-      perdants.forEach(id => delta[id] = points);
-    }
-  } else {
-    // Jeu seul contre 3
-    const defenseIds = joueurIds.filter(id => id !== contrat.joueurId);
-    if (reussite) {
-      delta[contrat.joueurId] = points * 3;
-      defenseIds.forEach(id => delta[id] = -points);
-    } else {
-      delta[contrat.joueurId] = -points * 3;
-      defenseIds.forEach(id => delta[id] = points);
-    }
-  }
-
+  const pointsBase = bareme[contrat.id] ?? 10;
   const plisTotal = (plisParJoueur[contrat.joueurId] ?? 0) +
     (contrat.partenaireId !== undefined ? (plisParJoueur[contrat.partenaireId] ?? 0) : 0);
+
+  // Calcul des Overtricks (+/- 2 ou 3 par pli de différence)
+  let bonusPlis = 0;
+  if (contrat.id === 'proposal' || contrat.id === 'solo') {
+    bonusPlis = (plisTotal - contrat.plisObjectif) * 2;
+  } else if (contrat.id === 'abondance' || contrat.id === 'abondance_declaree') {
+    bonusPlis = (plisTotal - contrat.plisObjectif) * 3;
+  }
+
+  const pointsFinal = pointsBase + (reussite ? bonusPlis : -Math.abs(bonusPlis));
+
+  if (contrat.id === 'proposal') {
+    const gagnants = [contrat.joueurId, contrat.partenaireId!];
+    const perdants = joueurIds.filter(id => !gagnants.includes(id));
+    if (reussite) {
+      gagnants.forEach(id => delta[id] = pointsFinal);
+      perdants.forEach(id => delta[id] = -pointsFinal);
+    } else {
+      gagnants.forEach(id => delta[id] = -pointsBase);
+      perdants.forEach(id => delta[id] = pointsBase);
+    }
+  } else {
+    const defenseIds = joueurIds.filter(id => id !== contrat.joueurId);
+    if (reussite) {
+      delta[contrat.joueurId] = pointsFinal * 3;
+      defenseIds.forEach(id => delta[id] = -pointsFinal);
+    } else {
+      delta[contrat.joueurId] = -pointsBase * 3;
+      defenseIds.forEach(id => delta[id] = pointsBase);
+    }
+  }
 
   return {
     reussite,
     plisJoueurEtPartenaire: plisTotal,
     deltaScores: delta,
-    details: reussite ? `✓ ${contrat.nom} réussi` : `✗ ${contrat.nom} chute`,
+    details: reussite
+      ? `✓ ${contrat.nom} réussi (${pointsFinal} pts)`
+      : `✗ ${contrat.nom} chute (${pointsBase} pts)`,
   };
 }
 
@@ -211,6 +240,7 @@ export function calculerScoreSolo(
 export function calculerScoreBidWhist(
   contrat: ContratJoue,
   plisParJoueur: Record<number, number>,
+  _joueurs?: any[],
 ): ResultatManche {
   const reussite = evaluerReussite(contrat, plisParJoueur);
   const delta: Record<number, number> = {};

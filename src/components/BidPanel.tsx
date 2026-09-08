@@ -7,7 +7,7 @@ import {
   View, Text, TouchableOpacity, ScrollView,
   StyleSheet, Modal, Vibration,
 } from 'react-native';
-import { Carte, Couleur, ContratJoue } from '../engine/types';
+import { Carte, Couleur, ContratJoue, Joueur } from '../engine/types';
 import { ContratConfig, VariantConfig } from '../variants/types';
 import { SYMBOLE, estRouge } from '../engine/deck';
 import { choisirEnchere } from '../ai/SimpleAI';
@@ -23,6 +23,7 @@ interface BidPanelProps {
   variante: VariantConfig;
   meilleureEnchere: ContratJoue | null;
   joueurEnCours: string;   // nom
+  joueurs: Joueur[];       // pour afficher le nom du meilleur encherisseur
   onEnchere: (contratId: string, atout?: Couleur, asPartenaire?: Carte) => void;
   onPasse: () => void;
   main: Carte[];           // main du joueur humain (pour choisir l'As partenaire)
@@ -35,6 +36,7 @@ export const BidPanel: React.FC<BidPanelProps> = ({
   variante,
   meilleureEnchere,
   joueurEnCours,
+  joueurs,
   onEnchere,
   onPasse,
   main,
@@ -187,19 +189,46 @@ export const BidPanel: React.FC<BidPanelProps> = ({
     });
   }, [main, contratSel]);
 
+  // Récupérer le nom du joueur qui a fait la meilleure enchère
+  const meilleurEncherisseur = React.useMemo(() => {
+    if (!meilleureEnchere) return null;
+    return joueurs.find(j => j.id === meilleureEnchere.joueurId)?.nom ?? '—';
+  }, [meilleureEnchere, joueurs]);
+
   return (
     <View style={styles.container}>
 
       {/* En-tête */}
       <View style={styles.header}>
-        <Text style={styles.titre}>Enchères</Text>
-        <Text style={styles.sousTitre}>
-          {meilleureEnchere
-            ? `Meilleure enchère : ${
-                variante.contrats.find(c => c.id === meilleureEnchere.id)?.nom ?? '—'
-              }`
-            : 'Aucune enchère — soyez le premier'}
-        </Text>
+        <View style={styles.headerRow}>
+          <Text style={styles.titre}>Enchères</Text>
+          <View style={styles.tourBadge}>
+            <Text style={styles.tourTexte}>Tour de : {joueurEnCours}</Text>
+          </View>
+        </View>
+
+        {meilleureEnchere ? (
+          <View style={styles.currentBidBox}>
+            <Text style={styles.currentBidLabel}>Meilleure enchère actuelle :</Text>
+            <View style={styles.bidBadge}>
+              <Text style={styles.bidPlayer}>{meilleurEncherisseur}</Text>
+              <Text style={styles.bidAction}>
+                {meilleureEnchere.id === 'propose' ? 'propose' :
+                 meilleureEnchere.id === 'emballe' ? 'emballe' :
+                 'annonce'}
+              </Text>
+              <Text style={styles.bidValue}>
+                {/* Pour Propose/Emballe, on n'affiche que l'atout pour éviter la répétition (ex: Marc propose à Coeur) */}
+                {meilleureEnchere.id === 'propose' || meilleureEnchere.id === 'emballe'
+                  ? (meilleureEnchere.atout ? ` à ${SYMBOLE[meilleureEnchere.atout]}` : '')
+                  : `${meilleureEnchere.nom}${meilleureEnchere.atout ? ` à ${SYMBOLE[meilleureEnchere.atout]}` : ''}`
+                }
+              </Text>
+            </View>
+          </View>
+        ) : (
+          <Text style={styles.sousTitre}>Aucune enchère — soyez le premier</Text>
+        )}
       </View>
 
       {/* Recommendation Apprentissage */}
@@ -424,6 +453,61 @@ const styles = StyleSheet.create({
     fontSize: FontSize.sm,
     color: Colors.textMuted,
     marginTop: 3,
+  },
+  headerRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: Spacing.xs,
+  },
+  tourBadge: {
+    backgroundColor: Colors.info + '22',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: Radius.sm,
+    borderWidth: 0.5,
+    borderColor: Colors.info,
+  },
+  tourTexte: {
+    fontSize: 10,
+    color: Colors.info,
+    fontWeight: FontWeight.bold,
+    textTransform: 'uppercase',
+  },
+  currentBidBox: {
+    marginTop: Spacing.xs,
+    backgroundColor: Colors.bgCard,
+    padding: Spacing.sm,
+    borderRadius: Radius.md,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  currentBidLabel: {
+    fontSize: 10,
+    color: Colors.textMuted,
+    textTransform: 'uppercase',
+    fontWeight: FontWeight.bold,
+    marginBottom: 4,
+  },
+  bidBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  bidPlayer: {
+    fontSize: FontSize.md,
+    fontWeight: FontWeight.bold,
+    color: Colors.textPrimary,
+  },
+  bidAction: {
+    fontSize: FontSize.sm,
+    color: Colors.textSecondary,
+    fontStyle: 'italic',
+  },
+  bidValue: {
+    fontSize: FontSize.md,
+    fontWeight: FontWeight.black,
+    color: Colors.primary,
   },
   mainContainer: {
     backgroundColor: 'rgba(255,255,255,0.03)',

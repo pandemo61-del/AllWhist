@@ -245,6 +245,7 @@ export default function GameScreen() {
                     variante={variante}
                     meilleureEnchere={etatEnchere.meilleureEnchere as any}
                     joueurEnCours={joueurs[etatEnchere.joueurCourantId]?.nom ?? ''}
+                    joueurs={joueurs}
                     onEnchere={handleEnchere}
                     onPasse={passerEnchere}
                     main={joueurs[0]?.main ?? []}

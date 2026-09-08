@@ -136,5 +136,5 @@ export const WhistGand: VariantConfig = {
   partenaire: 'as-secret',
   equipeFixe: false,
   plisParManche: 13,
-  calculScore: calculerScoreGenerique,
+  calculScore: (contrat, plisParJoueur, joueurs) => calculerScoreGenerique(contrat, plisParJoueur, joueurs),
 };

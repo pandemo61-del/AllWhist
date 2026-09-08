@@ -30,6 +30,11 @@ export function choisirCarte(
 ): Carte {
   const jouables = cartesJouables(joueur.main, pli, atout ?? undefined);
 
+  if (jouables.length === 0) {
+    // Cas de secours pour éviter le crash
+    return joueur.main[0];
+  }
+
   if (niveau === 'facile') {
     return choisirCarteAleatoire(jouables);
   }

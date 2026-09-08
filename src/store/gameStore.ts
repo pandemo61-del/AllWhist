@@ -175,8 +175,8 @@ export const useGameStore = create<GameStore>()(
       estScenario: false,
     });
 
-    // Lancer l'IA si elle commence (ou autoJeu)
-    if (phaseInitiale !== 'distribution' && variante.atoutChoisi && ((donneur + 1) % 4 !== 0 || settings.autoJeu)) {
+    // Lancer l'IA si elle commence (ou autoEnchere / autoJeu)
+    if (phaseInitiale !== 'distribution' && variante.atoutChoisi && ((donneur + 1) % 4 !== 0 || useSettingsStore.getState().autoEnchere)) {
       setTimeout(() => get()._faireProchaineActionIA(), 600);
     }
   },
@@ -225,7 +225,7 @@ export const useGameStore = create<GameStore>()(
       estScenario: true,
     });
 
-    if (phaseInitiale !== 'distribution' && variante.atoutChoisi && ((donneur + 1) % 4 !== 0 || settings.autoJeu)) {
+    if (phaseInitiale !== 'distribution' && variante.atoutChoisi && ((donneur + 1) % 4 !== 0 || useSettingsStore.getState().autoEnchere)) {
       setTimeout(() => get()._faireProchaineActionIA(), 600);
     }
   },
@@ -343,7 +343,7 @@ export const useGameStore = create<GameStore>()(
         const plisCpte = compterPlisParJoueur(nouveauxPlis);
         const variante = getVariante(state.varianteId);
         const contrat = state.contratEnCours!;
-        const resultat = (variante.calculScore ?? calculerScoreGenerique)(contrat, plisCpte);
+        const resultat = (variante.calculScore ?? calculerScoreGenerique)(contrat, plisCpte, state.joueurs);
         const scoreManche = construireScoreManche(state.manche, contrat, plisCpte, resultat);
         scoreManche.erreurs = toutesErreurs;
 
@@ -552,6 +552,11 @@ export const useGameStore = create<GameStore>()(
   _poserCarte(carte: Carte, joueurId: number) {
     const state = get();
 
+    if (!carte) {
+      if (__DEV__) console.warn(`_poserCarte appelée avec une carte indéfinie pour le joueur ${joueurId}.`);
+      return;
+    }
+
     // GARDE-FOU : Vérifier si le joueur a déjà posé une carte dans ce pli
     if (state.pliEnCours.cartesJouees.some(cp => cp.joueurId === joueurId)) {
       if (__DEV__) console.warn(`Joueur ${joueurId} a tenté de jouer deux fois dans le même pli.`);
@@ -697,11 +702,11 @@ export const useGameStore = create<GameStore>()(
     }
 
     // C'est au tour d'un joueur humain ?
-    if (etatEnchere.joueurCourantId === 0) return;
+    if (etatEnchere.joueurCourantId === 0 && !useSettingsStore.getState().autoEnchere) return;
 
-    // IA enchérit
+    // IA ou Humain en mode autoEnchere
     const iaJoueur = state.joueurs[etatEnchere.joueurCourantId];
-    const niveau = iaJoueur.type.replace('ia_', '') as NiveauIA;
+    const niveau = iaJoueur.type === 'humain' ? 'expert' : iaJoueur.type.replace('ia_', '') as NiveauIA;
 
     const decision = choisirEnchere(
       iaJoueur.main,
@@ -734,6 +739,8 @@ export const useGameStore = create<GameStore>()(
     if (state.tourDeJoueur === 0 && !settings.autoJeu) return;
 
     const iaJoueur = state.joueurs[state.tourDeJoueur];
+    if (!iaJoueur || iaJoueur.main.length === 0) return;
+
     const niveau = iaJoueur.type === 'humain' ? 'expert' : iaJoueur.type.replace('ia_', '') as NiveauIA;
     const cartesJouees = state.plisTermines.flatMap(p => p.cartesJouees.map(c => c.carte));
 
