@@ -117,7 +117,7 @@ jobs:
         run: |
           START=$(date +%s)
 
-          npm ci
+          npm ci --legacy-peer-deps
 
           END=$(date +%s)
           echo "- npm ci: $((END - START)) seconds" >> "$GITHUB_STEP_SUMMARY"
