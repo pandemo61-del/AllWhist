@@ -91,7 +91,7 @@ export const GameTable: React.FC<any> = ({
               />
             </View>
 
-            <View style={[styles.middleRow, { flex: 5 }]}>
+            <View style={[styles.middleRow, { flex: 5, overflow: 'visible' }]}>
               <Player
                 j={joueurs[1]}
                 active={tourDeJoueur === 1}
@@ -108,14 +108,6 @@ export const GameTable: React.FC<any> = ({
 
               <View style={styles.pliZone}>
                 <View style={styles.tableCenter} />
-
-                {/* Zone de pli — Maintenant parfaitement centrée dans pliZone */}
-                <View style={styles.pliOverlayInternal} pointerEvents="none">
-                  {(phase === 'jeu' || phase === 'fin_pli') && pliEnCours.cartesJouees.map((cp: CartePosee) => (
-                    <PlayedCard key={cp.joueurId} cp={cp} winner={pliEnCours.gagnantId} />
-                  ))}
-                </View>
-
                 {centerContent}
               </View>
 
@@ -132,6 +124,13 @@ export const GameTable: React.FC<any> = ({
                 cardsCount={phase === 'distribution' ? cardsReceived[3] : undefined}
                 compact={phase === 'jeu' || phase === 'fin_pli'}
               />
+
+              {/* Zone de pli — Déplacée à la fin de middleRow pour être au-dessus des joueurs latéraux */}
+              <View style={styles.pliOverlayInternal} pointerEvents="none">
+                {(phase === 'jeu' || phase === 'fin_pli') && pliEnCours.cartesJouees.map((cp: CartePosee) => (
+                  <PlayedCard key={cp.joueurId} cp={cp} winner={pliEnCours.gagnantId} />
+                ))}
+              </View>
             </View>
           </>
         )}
@@ -253,6 +252,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     zIndex: 100,
+    elevation: 10,
     overflow: 'visible',
   },
   tableCenter: {
@@ -307,7 +307,9 @@ const styles = StyleSheet.create({
     position: 'absolute',
     marginLeft: -normalize(45),
     marginTop: -normalize(64),
-    ...Shadows.card
+    ...Shadows.card,
+    zIndex: 150,
+    elevation: 12,
   },
   dealerBadge: {
     position: 'absolute',

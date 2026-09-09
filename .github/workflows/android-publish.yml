@@ -122,6 +122,15 @@ jobs:
           END=$(date +%s)
           echo "- npm ci: $((END - START)) seconds" >> "$GITHUB_STEP_SUMMARY"
 
+      - name: Prebuild Android
+        run: |
+          START=$(date +%s)
+          
+          npx expo prebuild --platform android --no-install
+          
+          END=$(date +%s)
+          echo "- Expo prebuild: $((END - START)) seconds" >> "$GITHUB_STEP_SUMMARY"
+
       - name: Read App Version From app.json
         run: |
           START=$(date +%s)
