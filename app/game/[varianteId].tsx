@@ -280,6 +280,7 @@ export default function GameScreen() {
             {/* Résultat fin de pli */}
             {phase === 'fin_pli' && pliEnCours.gagnantId !== undefined && (
               <PliResultat
+                key={pliEnCours.numero}
                 gagnantNom={joueurs[pliEnCours.gagnantId]?.nom ?? ''}
                 gagnantId={pliEnCours.gagnantId}
                 humanId={0}

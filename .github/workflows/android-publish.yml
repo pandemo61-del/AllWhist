@@ -127,6 +127,14 @@ jobs:
           START=$(date +%s)
           
           npx expo prebuild --platform android --no-install
+
+          # Correction de la version de Kotlin (Incompatibilité Ads SDK 25.4.0)
+          # On force la version 2.1.0 qui est attendue par le compilateur
+          sed -i 's/android.kotlinVersion=2.3.0/android.kotlinVersion=2.1.0/g' android/gradle.properties
+          sed -i 's/kotlin-gradle-plugin:2.2.20/kotlin-gradle-plugin:2.1.0/g' android/build.gradle
+          
+          # Injection de kotlinVersion dans le bloc ext pour les sous-projets (ads, async-storage, etc.)
+          sed -i '/ext {/a \    kotlinVersion = "2.1.0"' android/build.gradle
           
           END=$(date +%s)
           echo "- Expo prebuild: $((END - START)) seconds" >> "$GITHUB_STEP_SUMMARY"
@@ -363,6 +371,19 @@ jobs:
           MYAPP_RELEASE_KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
           MYAPP_RELEASE_STORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
           MYAPP_RELEASE_KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+
+      - name: Upload Build Logs on Failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-logs-${{ env.VERSION_CODE }}
+          path: |
+            android/build/reports/
+            android/app/build/reports/
+            **/build/reports/
+            **/build/test-results/
+            android/build/outputs/logs/
+          retention-days: 7
 
       - name: Rename AAB Artifact
         run: |

@@ -91,7 +91,7 @@ export const GameTable: React.FC<any> = ({
               />
             </View>
 
-            <View style={[styles.middleRow, { flex: 5, overflow: 'visible' }]}>
+            <View style={[styles.middleRow, { flex: 5, zIndex: 10, elevation: 5 }]}>
               <Player
                 j={joueurs[1]}
                 active={tourDeJoueur === 1}
@@ -108,6 +108,18 @@ export const GameTable: React.FC<any> = ({
 
               <View style={styles.pliZone}>
                 <View style={styles.tableCenter} />
+
+                {/* Zone de pli — Centrage garanti avec absoluteFill et flex center */}
+                <View style={styles.pliOverlayInternal} pointerEvents="none">
+                  {(phase === 'jeu' || phase === 'fin_pli') && pliEnCours.cartesJouees.map((cp: CartePosee) => (
+                    <PlayedCard
+                      key={`${pliEnCours.numero}-${cp.joueurId}`}
+                      cp={cp}
+                      winner={pliEnCours.gagnantId}
+                    />
+                  ))}
+                </View>
+
                 {centerContent}
               </View>
 
@@ -124,13 +136,6 @@ export const GameTable: React.FC<any> = ({
                 cardsCount={phase === 'distribution' ? cardsReceived[3] : undefined}
                 compact={phase === 'jeu' || phase === 'fin_pli'}
               />
-
-              {/* Zone de pli — Déplacée à la fin de middleRow pour être au-dessus des joueurs latéraux */}
-              <View style={styles.pliOverlayInternal} pointerEvents="none">
-                {(phase === 'jeu' || phase === 'fin_pli') && pliEnCours.cartesJouees.map((cp: CartePosee) => (
-                  <PlayedCard key={cp.joueurId} cp={cp} winner={pliEnCours.gagnantId} />
-                ))}
-              </View>
             </View>
           </>
         )}
@@ -151,7 +156,7 @@ export const GameTable: React.FC<any> = ({
               compact={phase === 'jeu' || phase === 'fin_pli'}
             />
           )}
-          <View style={styles.handContainer}>
+        <View style={styles.handContainer}>
             {phase === 'distribution'
               ? (React.isValidElement(children) ? React.cloneElement(children as any, { maxVisible: cardsReceived[0] }) : null)
               : children
@@ -169,9 +174,20 @@ export const GameTable: React.FC<any> = ({
 };
 
 const PlayedCard = ({ cp, winner }: { cp: CartePosee, winner?: number }) => {
-  // Les cibles sont maintenant relatives au centre exact de la table
-  const target = [{ x: 0, y: 65 }, { x: -80, y: 0 }, { x: 0, y: -65 }, { x: 80, y: 0 }][cp.joueurId];
-  const start = [{ x: 0, y: 200 }, { x: -200, y: 0 }, { x: 0, y: -200 }, { x: 200, y: 0 }][cp.joueurId];
+  // Cibles ajustées pour un centrage parfait et un bel étalement
+  const target = [
+    { x: 0, y: normalize(60) },   // Vous (Sud)
+    { x: -normalize(75), y: 0 },  // Marc (Ouest)
+    { x: 0, y: -normalize(60) },  // Julie (Nord)
+    { x: normalize(75), y: 0 }    // Paul (Est)
+  ][cp.joueurId];
+
+  const start = [
+    { x: 0, y: normalize(200) },
+    { x: -normalize(200), y: 0 },
+    { x: 0, y: -normalize(200) },
+    { x: normalize(200), y: 0 }
+  ][cp.joueurId];
   const anim = useRef(new Animated.ValueXY(start)).current;
   const fade = useRef(new Animated.Value(0)).current;
 
@@ -246,20 +262,29 @@ const styles = StyleSheet.create({
   arena: { flex: 1, padding: 5, justifyContent: 'space-between' },
   posNord: { alignItems: 'center', height: 80 },
   middleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  pliZone: { flex: 1, height: '100%', justifyContent: 'center', alignItems: 'center', position: 'relative', overflow: 'visible' },
+  pliZone: {
+    flex: 1,
+    height: '100%',
+    justifyContent: 'center',
+    alignItems: 'center',
+    position: 'relative',
+    overflow: 'visible',
+    zIndex: 999, // Passe au-dessus des joueurs latéraux Ouest/Est
+    elevation: 10,
+  },
   pliOverlayInternal: {
     ...StyleSheet.absoluteFillObject,
     justifyContent: 'center',
     alignItems: 'center',
-    zIndex: 100,
-    elevation: 10,
+    zIndex: 1000,
+    elevation: 20,
     overflow: 'visible',
   },
   tableCenter: {
     position: 'absolute',
-    width: SW * 0.5,
-    height: SW * 0.5,
-    borderRadius: SW * 0.25,
+    width: SW * 0.55,
+    height: SW * 0.55,
+    borderRadius: SW * 0.3,
     backgroundColor: 'rgba(0,0,0,0.03)',
     borderWidth: 1,
     borderColor: 'rgba(0,0,0,0.05)',
@@ -293,14 +318,9 @@ const styles = StyleSheet.create({
   overlay: { ...StyleSheet.absoluteFillObject, justifyContent: 'center', alignItems: 'center', zIndex: 50 },
   pliOverlay: { position: 'absolute', ...StyleSheet.absoluteFillObject, justifyContent: 'center', alignItems: 'center', zIndex: 100, overflow: 'visible' },
   pliOverlayGlobal: {
-    position: 'absolute',
-    top: '30%', // Centré sur la zone de jeu
-    left: 0,
-    right: 0,
-    bottom: '25%', // Laisse la place pour la main
-    justifyContent: 'center',
-    alignItems: 'center',
-    zIndex: 1000, // Passe au-dessus de tout
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 9999,
+    elevation: 25,
     pointerEvents: 'none',
   },
   pCard: {
@@ -308,8 +328,8 @@ const styles = StyleSheet.create({
     marginLeft: -normalize(45),
     marginTop: -normalize(64),
     ...Shadows.card,
-    zIndex: 150,
-    elevation: 12,
+    zIndex: 2000,
+    elevation: 25,
   },
   dealerBadge: {
     position: 'absolute',
