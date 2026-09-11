@@ -52,6 +52,7 @@ export const WhistClassique: VariantConfig = {
   partenaire: 'fixe',
   equipeFixe: true,
   plisParManche: 13,
+  manchesParDefaut: 13,
   calculScore: (_, plisParJoueur, joueurs) => calculerScoreClassique(plisParJoueur, joueurs),
 };
 
@@ -156,6 +157,7 @@ export const SoloWhist: VariantConfig = {
   partenaire: 'as-secret',
   equipeFixe: false,
   plisParManche: 13,
+  manchesParDefaut: 13,
   calculScore: (contrat, plisParJoueur, joueurs) => calculerScoreSolo(contrat, plisParJoueur, joueurs),
 };
 
@@ -261,6 +263,7 @@ export const BostonWhist: VariantConfig = {
   partenaire: 'aucun',
   equipeFixe: false,
   plisParManche: 13,
+  manchesParDefaut: 13,
   calculScore: (contrat, plisParJoueur, joueurs) => calculerScoreBoston(contrat, plisParJoueur, joueurs),
 };
 
@@ -357,5 +360,6 @@ export const BidWhist: VariantConfig = {
   partenaire: 'fixe',
   equipeFixe: true,
   plisParManche: 13,
+  manchesParDefaut: 13,
   calculScore: (contrat, plisParJoueur, joueurs) => calculerScoreBidWhist(contrat, plisParJoueur, joueurs),
 };

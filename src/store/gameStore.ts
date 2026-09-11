@@ -120,15 +120,16 @@ export const useGameStore = create<GameStore>()(
   //  INITIALISATION
   // ──────────────────────────────────────────
 
-  initialiserPartie(varianteId, nomJoueur = 'Vous') {
+  initialiserPartie(varianteId, nomJoueur) {
     const variante = getVariante(varianteId);
     const settings = useSettingsStore.getState();
+    const pseudoEffective = nomJoueur || settings.pseudo || 'Vous';
     const donneur = Math.floor(Math.random() * 4); // Premier donneur aléatoire
     const sessionGameId = `G-${Math.random().toString(36).substring(2, 9).toUpperCase()}`;
 
     const joueurs: Joueur[] = Array.from({ length: 4 }, (_, i) => ({
       id: i,
-      nom: i === 0 ? nomJoueur : NOMS_IA[i - 1],
+      nom: i === 0 ? pseudoEffective : NOMS_IA[i - 1],
       type: i === 0 ? 'humain' : `ia_${NIVEAUX_IA[i - 1]}` as any,
       main: [],
       plisGagnesTotal: 0,
@@ -181,15 +182,16 @@ export const useGameStore = create<GameStore>()(
     }
   },
 
-  chargerScenario(scenario, nomJoueur = 'Vous') {
+  chargerScenario(scenario, nomJoueur) {
     const variante = getVariante(scenario.varianteId);
     const settings = useSettingsStore.getState();
+    const pseudoEffective = nomJoueur || settings.pseudo || 'Vous';
     const donneur = 0;
     const sessionGameId = `S-${Math.random().toString(36).substring(2, 9).toUpperCase()}`;
 
     const joueurs: Joueur[] = Array.from({ length: 4 }, (_, i) => ({
       id: i,
-      nom: i === 0 ? nomJoueur : NOMS_IA[i - 1],
+      nom: i === 0 ? pseudoEffective : NOMS_IA[i - 1],
       type: i === 0 ? 'humain' : `ia_${NIVEAUX_IA[i - 1]}` as any,
       main: i === 0
         ? trierMain(scenario.mains[i], scenario.atoutInitial, {
@@ -335,6 +337,9 @@ export const useGameStore = create<GameStore>()(
       const estMisere = contrat?.id.startsWith('misere');
       const miserePerdue = estMisere && gagnant === contrat.joueurId;
 
+      const settings = useSettingsStore.getState();
+      const MAX_MANCHES = settings.nbManchesParPartie;
+
       if (mancheTerminee(nouveauxPlis) || miserePerdue) {
         // Analyser toutes les erreurs de la manche
         const toutesErreurs = nouveauxPlis.flatMap(p => analyserPli(p, state.contratEnCours!, state.atout, nouveauxPlis));
@@ -408,7 +413,8 @@ export const useGameStore = create<GameStore>()(
 
   avancerManche(estRedistribution = false) {
     const state = get();
-    const MAX = __DEV__ ? 3 : 13;
+    const settings = useSettingsStore.getState();
+    const MAX = settings.nbManchesParPartie;
 
     if (!estRedistribution && state.manche >= MAX) {
       set({ phase: 'fin_partie' });

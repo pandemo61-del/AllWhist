@@ -8,7 +8,20 @@ export type OrdreValeur = 'croissant' | 'decroissant'; // 2 -> A ou A -> 2
 export type DirectionTri = 'gauche_droite' | 'droite_gauche';
 export type Langue = 'fr' | 'en' | 'nl' | 'de' | 'es' | 'pt';
 
+const COULEURS = ['Rouge', 'Bleu', 'Vert', 'Jaune', 'Noir', 'Blanc', 'Violet', 'Orange'];
+const ADJECTIFS = ['Grand', 'Petit', 'Fort', 'Rapide', 'Sage', 'Brave', 'Fier', 'Calme'];
+const NOMS = ['Lion', 'Aigle', 'Loup', 'Ours', 'Renard', 'Faucon', 'Tigre', 'Lynx'];
+
+const genererPseudoAleatoire = () => {
+  const c = COULEURS[Math.floor(Math.random() * COULEURS.length)];
+  const a = ADJECTIFS[Math.floor(Math.random() * ADJECTIFS.length)];
+  const n = NOMS[Math.floor(Math.random() * NOMS.length)];
+  return `${c} ${a} ${n}`;
+};
+
 interface SettingsState {
+  pseudo: string;
+  nbManchesParPartie: number;
   ordreCouleurs: OrdreTriCouleur;
   ordreValeur: OrdreValeur;
   directionTri: DirectionTri;
@@ -22,6 +35,8 @@ interface SettingsState {
   coachCredits: number;
   lastDailyRewardDate: string | null;
 
+  setPseudo: (pseudo: string) => void;
+  setNbManchesParPartie: (nb: number) => void;
   setOrdreCouleurs: (ordre: OrdreTriCouleur) => void;
   setOrdreValeur: (ordre: OrdreValeur) => void;
   setDirectionTri: (direction: DirectionTri) => void;
@@ -35,6 +50,7 @@ interface SettingsState {
   useCoachCredit: () => boolean;
   addCoachCredits: (amount: number) => void;
   checkDailyReward: () => void;
+  genererPseudoAleatoire: () => string;
 }
 
 const DEFAULT_ORDRE_COULEURS: OrdreTriCouleur = [
@@ -47,6 +63,8 @@ const DEFAULT_ORDRE_COULEURS: OrdreTriCouleur = [
 export const useSettingsStore = create<SettingsState>()(
   persist(
     (set, get) => ({
+      pseudo: genererPseudoAleatoire(),
+      nbManchesParPartie: 13,
       ordreCouleurs: DEFAULT_ORDRE_COULEURS,
       ordreValeur: 'croissant',
       directionTri: 'gauche_droite',
@@ -60,6 +78,8 @@ export const useSettingsStore = create<SettingsState>()(
       coachCredits: 5,
       lastDailyRewardDate: null,
 
+      setPseudo: (pseudo) => set({ pseudo }),
+      setNbManchesParPartie: (nb) => set({ nbManchesParPartie: nb }),
       setOrdreCouleurs: (ordre) => set({ ordreCouleurs: ordre }),
       setOrdreValeur: (ordre) => set({ ordreValeur: ordre }),
       setDirectionTri: (direction) => set({ directionTri: direction }),
@@ -89,6 +109,7 @@ export const useSettingsStore = create<SettingsState>()(
           });
         }
       },
+      genererPseudoAleatoire: () => genererPseudoAleatoire(),
     }),
     {
       name: 'allwhist-settings',

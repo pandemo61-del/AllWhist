@@ -168,7 +168,8 @@ export default function GameScreen() {
   }
 
   // Déterminer si la partie est terminée
-  const MAX_MANCHES = __DEV__ ? 3 : 13;
+  const settings = useSettingsStore.getState();
+  const MAX_MANCHES = settings.nbManchesParPartie;
   const partieTerminee = manche >= MAX_MANCHES;
 
   const handleContinuerApresResultats = () => {

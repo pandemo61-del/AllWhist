@@ -126,15 +126,8 @@ jobs:
         run: |
           START=$(date +%s)
           
+          # Utilisation de la version stable d'Expo générée
           npx expo prebuild --platform android --no-install
-
-          # Correction de la version de Kotlin (Incompatibilité Ads SDK 25.4.0)
-          # On force la version 2.1.0 qui est attendue par le compilateur
-          sed -i 's/android.kotlinVersion=2.3.0/android.kotlinVersion=2.1.0/g' android/gradle.properties
-          sed -i 's/kotlin-gradle-plugin:2.2.20/kotlin-gradle-plugin:2.1.0/g' android/build.gradle
-          
-          # Injection de kotlinVersion dans le bloc ext pour les sous-projets (ads, async-storage, etc.)
-          sed -i '/ext {/a \    kotlinVersion = "2.1.0"' android/build.gradle
           
           END=$(date +%s)
           echo "- Expo prebuild: $((END - START)) seconds" >> "$GITHUB_STEP_SUMMARY"
@@ -361,7 +354,8 @@ jobs:
             --build-cache \
             --parallel \
             --configure-on-demand \
-            --profile
+            --profile \
+            --stacktrace 2>&1 | tee build.log
 
           END=$(date +%s)
           echo "- Gradle bundleRelease: $((END - START)) seconds" >> "$GITHUB_STEP_SUMMARY"
@@ -372,12 +366,13 @@ jobs:
           MYAPP_RELEASE_STORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
           MYAPP_RELEASE_KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
 
-      - name: Upload Build Logs on Failure
-        if: failure()
+      - name: Upload Build Logs
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: build-logs-${{ env.VERSION_CODE }}
           path: |
+            android/build.log
             android/build/reports/
             android/app/build/reports/
             **/build/reports/

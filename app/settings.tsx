@@ -1,7 +1,7 @@
 import React from 'react';
 import {
   View, Text, StyleSheet, SafeAreaView,
-  TouchableOpacity, ScrollView,
+  TouchableOpacity, ScrollView, TextInput,
 } from 'react-native';
 import { router } from 'expo-router';
 import { useSettingsStore, DirectionTri, OrdreValeur, Langue } from '../src/store/settingsStore';
@@ -16,6 +16,8 @@ import { REWARDED_ID } from '../src/components/Ads';
 export default function SettingsScreen() {
   const { t } = useTranslation();
   const {
+    pseudo, setPseudo,
+    nbManchesParPartie, setNbManchesParPartie,
     directionTri, setDirectionTri,
     ordreValeur, setOrdreValeur,
     ordreCouleurs, setOrdreCouleurs,
@@ -87,6 +89,48 @@ export default function SettingsScreen() {
       </View>
 
       <ScrollView contentContainerStyle={styles.content}>
+
+        <View style={styles.section}>
+          <Text style={styles.sectionTitre}>Profil & Partie</Text>
+
+          <View style={styles.option}>
+            <Text style={styles.optionLabel}>Pseudo</Text>
+            <View style={styles.pseudoContainer}>
+              <TextInput
+                style={styles.inputPseudo}
+                value={pseudo}
+                onChangeText={setPseudo}
+                placeholder="Votre pseudo"
+                placeholderTextColor={Colors.textMuted}
+              />
+              <TouchableOpacity
+                onPress={() => setPseudo(useSettingsStore.getState().genererPseudoAleatoire())}
+                style={styles.btnRandom}
+              >
+                <Text style={styles.btnRandomTexte}>🎲</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          <View style={styles.option}>
+            <Text style={styles.optionLabel}>Manches par partie</Text>
+            <View style={styles.nbManchesControl}>
+              <TouchableOpacity
+                onPress={() => setNbManchesParPartie(Math.max(1, nbManchesParPartie - 1))}
+                style={styles.btnMoinsPlus}
+              >
+                <Text style={styles.btnMoinsPlusTexte}>-</Text>
+              </TouchableOpacity>
+              <Text style={styles.nbManchesValeur}>{nbManchesParPartie}</Text>
+              <TouchableOpacity
+                onPress={() => setNbManchesParPartie(Math.min(50, nbManchesParPartie + 1))}
+                style={styles.btnMoinsPlus}
+              >
+                <Text style={styles.btnMoinsPlusTexte}>+</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
 
         <View style={styles.section}>
           <Text style={styles.sectionTitre}>{t('settings.language') || 'Langue'}</Text>
@@ -399,5 +443,60 @@ const styles = StyleSheet.create({
   },
   btnDisabled: {
     opacity: 0.5,
+  },
+  inputPseudo: {
+    backgroundColor: Colors.bgSurface,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.xs,
+    borderRadius: Radius.sm,
+    color: Colors.primary,
+    fontWeight: FontWeight.bold,
+    minWidth: 120,
+    textAlign: 'right',
+    flex: 1,
+  },
+  pseudoContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+    flex: 1,
+    justifyContent: 'flex-end',
+  },
+  btnRandom: {
+    backgroundColor: Colors.bgSurface,
+    padding: Spacing.xs,
+    borderRadius: Radius.sm,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  btnRandomTexte: {
+    fontSize: 16,
+  },
+  nbManchesControl: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.md,
+  },
+  btnMoinsPlus: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: Colors.bgSurface,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  btnMoinsPlusTexte: {
+    fontSize: FontSize.lg,
+    color: Colors.primary,
+    fontWeight: FontWeight.bold,
+  },
+  nbManchesValeur: {
+    fontSize: FontSize.md,
+    fontWeight: FontWeight.bold,
+    color: Colors.textPrimary,
+    minWidth: 20,
+    textAlign: 'center',
   },
 });

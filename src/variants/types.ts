@@ -39,6 +39,7 @@ export interface VariantConfig {
   ordreInverse?: boolean;   // Bid Whist descendant
   avecKitty?: boolean;      // Bid Whist : 6 cartes cachées
   plisParManche: number;    // toujours 13
+  manchesParDefaut: number; // nombre de manches par partie par défaut
 
   // Calcul de score personnalisé (optionnel — sinon générique)
   calculScore?: (

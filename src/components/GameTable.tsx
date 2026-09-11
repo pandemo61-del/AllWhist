@@ -91,7 +91,7 @@ export const GameTable: React.FC<any> = ({
               />
             </View>
 
-            <View style={[styles.middleRow, { flex: 5, zIndex: 10, elevation: 5 }]}>
+            <View style={[styles.middleRow, { flex: 5, zIndex: 1000, elevation: 10 }]}>
               <Player
                 j={joueurs[1]}
                 active={tourDeJoueur === 1}
@@ -174,12 +174,20 @@ export const GameTable: React.FC<any> = ({
 };
 
 const PlayedCard = ({ cp, winner }: { cp: CartePosee, winner?: number }) => {
-  // Cibles ajustées pour un centrage parfait et un bel étalement
+  // Cibles ajustées pour un centrage compact et harmonieux
   const target = [
-    { x: 0, y: normalize(60) },   // Vous (Sud)
-    { x: -normalize(75), y: 0 },  // Marc (Ouest)
-    { x: 0, y: -normalize(60) },  // Julie (Nord)
-    { x: normalize(75), y: 0 }    // Paul (Est)
+    { x: 0, y: normalize(55) },    // Vous (Sud)
+    { x: -normalize(70), y: 0 },   // Marc (Ouest)
+    { x: 0, y: -normalize(55) },   // Julie (Nord)
+    { x: normalize(70), y: 0 }     // Paul (Est)
+  ][cp.joueurId];
+
+  // Rotation légère pour un effet plus naturel
+  const rotate = [
+    '2deg',
+    '-3deg',
+    '1deg',
+    '-2deg'
   ][cp.joueurId];
 
   const start = [
@@ -211,7 +219,17 @@ const PlayedCard = ({ cp, winner }: { cp: CartePosee, winner?: number }) => {
   }, [winner]);
 
   return (
-    <Animated.View style={[styles.pCard, { opacity: fade, transform: [{ translateX: anim.x }, { translateY: anim.y }] }]}>
+    <Animated.View style={[
+      styles.pCard,
+      {
+        opacity: fade,
+        transform: [
+          { translateX: anim.x },
+          { translateY: anim.y },
+          { rotate: rotate }
+        ]
+      }
+    ]}>
       <CardFace carte={cp.carte} taille="table" />
     </Animated.View>
   );
@@ -303,7 +321,7 @@ const styles = StyleSheet.create({
     top: '30%',
     zIndex: 10,
   },
-  sudArea: { alignItems: 'center', width: SW },
+  sudArea: { alignItems: 'center', width: SW, zIndex: 1 },
   handContainer: { width: SW, height: normalize(150), marginTop: 5 },
   pSlot: { backgroundColor: 'rgba(255,255,255,0.8)', borderRadius: 10, padding: 6, alignItems: 'center', minWidth: 80, position: 'relative' },
   pSlotCompact: { minWidth: 60, padding: 2 },
