@@ -76,7 +76,7 @@ export const WinningCardContainer: React.FC<{
           Animated.timing(glowAnim, {
             toValue: 1,
             duration: 400,
-            easing: Easing.inOut(Easing.sine),
+            easing: Easing.inOut(Easing.sin),
             useNativeDriver: false, // Pas disponible pour shadowOpacity
           }),
           Animated.spring(bounceAnim, {

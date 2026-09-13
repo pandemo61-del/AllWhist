@@ -30,7 +30,7 @@ export const DistributionAnimation: React.FC<{ onCardLanded: (playerId: number) 
 
   const startPos = targets[donneur];
   const pattern = PATTERNS[varianteId] || [4, 3, 3, 3];
-  const timers = useRef<NodeJS.Timeout[]>([]);
+  const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
 
   useEffect(() => {
     let cardCount = 0;

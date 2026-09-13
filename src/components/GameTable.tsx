@@ -61,7 +61,7 @@ export const GameTable: React.FC<any> = ({
       {/* ── Badges fixes en haut ── */}
       {!isBidding && (
         <View style={styles.topBadges}>
-          {atout && <View style={styles.badge}><Text style={styles.bTxt}>{SYMBOLE[atout]} Atout</Text></View>}
+          {atout && <View style={styles.badge}><Text style={styles.bTxt}>{SYMBOLE[atout as Couleur]} Atout</Text></View>}
           {contrat && <View style={[styles.badge, styles.bContrat]}><Text style={styles.bTxtW}>{contrat.nom}: {nbPlisEq}/{contrat.plisObjectif}</Text></View>}
           <View style={styles.badge}><Text style={styles.bTxt}>Pli {plisTermines.length + 1}/13</Text></View>
         </View>
@@ -334,7 +334,7 @@ const styles = StyleSheet.create({
   pScore: { fontSize: 10, color: '#455a64', fontWeight: 'bold' },
   pScoreHum: { fontSize: 14, color: Colors.primary },
   overlay: { ...StyleSheet.absoluteFillObject, justifyContent: 'center', alignItems: 'center', zIndex: 50 },
-  pliOverlay: { position: 'absolute', ...StyleSheet.absoluteFillObject, justifyContent: 'center', alignItems: 'center', zIndex: 100, overflow: 'visible' },
+  pliOverlay: { ...StyleSheet.absoluteFillObject, justifyContent: 'center', alignItems: 'center', zIndex: 100, overflow: 'visible' },
   pliOverlayGlobal: {
     ...StyleSheet.absoluteFillObject,
     zIndex: 9999,

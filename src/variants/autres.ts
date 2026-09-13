@@ -158,7 +158,7 @@ export const SoloWhist: VariantConfig = {
   equipeFixe: false,
   plisParManche: 13,
   manchesParDefaut: 13,
-  calculScore: (contrat, plisParJoueur, joueurs) => calculerScoreSolo(contrat, plisParJoueur, joueurs),
+  calculScore: (contrat, plisParJoueur) => calculerScoreSolo(contrat, plisParJoueur),
 };
 
 // ══════════════════════════════════════════════

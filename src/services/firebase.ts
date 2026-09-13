@@ -1,5 +1,9 @@
 import { initializeApp } from 'firebase/app';
-import { initializeAuth, getReactNativePersistence, signInAnonymously, onAuthStateChanged, User } from 'firebase/auth';
+import { initializeAuth, signInAnonymously, onAuthStateChanged, User } from 'firebase/auth';
+// Metro resolves the "react-native" export of @firebase/auth at runtime, but the
+// public firebase/auth typings only describe the browser build.
+// @ts-ignore
+import { getReactNativePersistence } from 'firebase/auth';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   getFirestore, doc, setDoc, getDoc, collection, addDoc, query, where, getDocs

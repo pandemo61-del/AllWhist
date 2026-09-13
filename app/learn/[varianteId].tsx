@@ -317,7 +317,7 @@ const styles = StyleSheet.create({
   scroll: { flex: 1 },
   scrollContent: {
     padding: Spacing.md,
-    paddingBottom: Spacing.xxxl,
+    paddingBottom: Spacing.xxl,
   },
 
   regleRow: {

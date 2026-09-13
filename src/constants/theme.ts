@@ -26,6 +26,9 @@ export const Colors = {
   warning: '#EF9F27',
   info: '#378ADD',
   cardRedVibrant: '#ff0000',
+  debutant: '#1D9E75',
+  intermediaire: '#378ADD',
+  expert: '#E24B4A',
 } as const;
 
 export const Spacing = {

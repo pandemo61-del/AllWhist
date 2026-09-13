@@ -2,7 +2,7 @@
 //  TYPE — Configuration d'une variante
 // ─────────────────────────────────────────────
 
-import { Carte, ContratJoue } from '../engine/types';
+import { Carte, ContratJoue, Joueur } from '../engine/types';
 import { ResultatManche } from '../engine/scoring';
 
 export interface ContratConfig {
@@ -45,5 +45,6 @@ export interface VariantConfig {
   calculScore?: (
     contrat: ContratJoue,
     plisParJoueur: Record<number, number>,
+    joueurs: Joueur[],
   ) => ResultatManche;
 }

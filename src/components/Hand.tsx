@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, Dimensions, Vibration } from 'react-native';
 import { CardFace } from './Card';
+import { Carte } from '../engine/types';
 import { useTranslation } from '../i18n';
 import { useSettingsStore } from '../store/settingsStore';
 import { Colors, Spacing, FontSize } from '../constants/theme';
@@ -59,7 +60,7 @@ export const Hand: React.FC<any> = ({ cartes, cartesJouables, onJouerCarte, phas
                 carte={c}
                 selectionne={isSel}
                 jouable={jouable}
-                onPress={(card) => {
+                onPress={(card: Carte) => {
                   if (isSel && jouable) {
                     onJouerCarte(card);
                     setSel(null);

@@ -2,8 +2,7 @@
 //  CALCUL DES SCORES
 // ─────────────────────────────────────────────
 
-import { ContratJoue } from './types';
-import { ScoreManche } from './types';
+import { ContratJoue, ScoreManche, Joueur, Carte } from './types';
 
 export interface ResultatManche {
   reussite: boolean;
@@ -144,7 +143,7 @@ export function calculerScoreBoston(
   if (joueurs && contrat.atout) {
     const main = joueurs.find(j => j.id === contrat.joueurId)?.main || [];
     const honneurs = [11, 12, 13, 14]; // V, D, R, A
-    const nbHonneurs = main.filter(c => c.couleur === contrat.atout && honneurs.includes(c.valeur)).length;
+    const nbHonneurs = main.filter((c: Carte) => c.couleur === contrat.atout && honneurs.includes(c.valeur)).length;
     if (nbHonneurs === 3) bonusHonneurs = 10;
     else if (nbHonneurs === 4) bonusHonneurs = 20;
   }

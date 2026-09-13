@@ -10,6 +10,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useGameStore } from '../../src/store/gameStore';
+import { useSettingsStore } from '../../src/store/settingsStore';
 import { GameTable }   from '../../src/components/GameTable';
 import { Hand }        from '../../src/components/Hand';
 import { BidPanel }    from '../../src/components/BidPanel';

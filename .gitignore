@@ -42,3 +42,5 @@ yarn-error.*
 
 # Key
 *.keystore
+# Signing material (CI decodes it from secrets)
+keystore_base64.txt

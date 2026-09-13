@@ -75,6 +75,12 @@ interface GameStore extends EtatPartie {
 
   variante: () => VariantConfig | null;
   cartesJouablesHumain: () => Carte[];
+
+  // ──── Internes ────────────────────────────
+
+  _poserCarte: (carte: Carte, joueurId: number) => void;
+  _avancerEncheres: () => void;
+  _faireProchaineActionIA: () => void;
 }
 
 // ─── État initial ──────────────────────────────
@@ -421,7 +427,6 @@ export const useGameStore = create<GameStore>()(
       return;
     }
 
-    const settings = useSettingsStore.getState();
     const nouveauDonneur = (state.donneur + 1) % 4;
     const variante = getVariante(state.varianteId);
     const jeu = melanger(creerJeu(variante.avecJoker));

@@ -7,12 +7,18 @@ import {
   View, Text, TouchableOpacity, StyleSheet,
   Animated, LayoutAnimation, Platform, UIManager, Easing,
 } from 'react-native';
-import { VariantConfig } from '../variants/types';
+import { VariantConfig, ContratConfig } from '../variants/types';
 import { Colors, Spacing, FontSize, FontWeight, Radius } from '../constants/theme';
 import { useTranslation } from '../i18n';
 
 if (Platform.OS === 'android') {
   UIManager.setLayoutAnimationEnabledExperimental?.(true);
+}
+
+interface VariantCardProps {
+  variante: VariantConfig;
+  selectionne: boolean;
+  onSelect: (id: string) => void;
 }
 
 export const VariantCard: React.FC<VariantCardProps> = ({
@@ -155,7 +161,7 @@ export const VariantCard: React.FC<VariantCardProps> = ({
           {/* Contrats disponibles */}
           <Text style={[styles.reglesLabel, { marginTop: Spacing.md }]}>{t('variants.contractsLabel')}</Text>
           <View style={styles.contratsGrid}>
-            {variante.contrats.filter(c => c.id !== 'passe').map(c => (
+            {variante.contrats.filter((c: ContratConfig) => c.id !== 'passe').map((c: ContratConfig) => (
               <View key={c.id} style={styles.contratPill}>
                 <Text style={styles.contratPillTexte}>
                   {t(`variants.${variante.id}.contrats.${c.id}.nom`) || c.nom}

@@ -121,13 +121,13 @@ export const usePulse = (minOpacity = 0.5, duration = 1000) => {
         Animated.timing(pulseAnim, {
           toValue: minOpacity,
           duration: duration / 2,
-          easing: Easing.inOut(Easing.sine),
+          easing: Easing.inOut(Easing.sin),
           useNativeDriver: true,
         }),
         Animated.timing(pulseAnim, {
           toValue: 1,
           duration: duration / 2,
-          easing: Easing.inOut(Easing.sine),
+          easing: Easing.inOut(Easing.sin),
           useNativeDriver: true,
         }),
       ]).start(({ finished }) => {
