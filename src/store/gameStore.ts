@@ -421,7 +421,6 @@ export const useGameStore = create<GameStore>()(
       return;
     }
 
-    const settings = useSettingsStore.getState();
     const nouveauDonneur = (state.donneur + 1) % 4;
     const variante = getVariante(state.varianteId);
     const jeu = melanger(creerJeu(variante.avecJoker));

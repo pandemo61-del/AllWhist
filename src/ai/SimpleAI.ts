@@ -283,6 +283,47 @@ export interface DecisionEnchere {
   asPartenaire?: string;
 }
 
+/** Évalue la force d'une main avec bonus de distribution. */
+function evaluerForceAvancee(main: Carte[]): { force: number, meilleureCol: Couleur, nbAtouts: number } {
+  const forceBrute = main.reduce((acc, c) => {
+    if (c.estJoker)    return acc + 6;
+    if (c.valeur === 14) return acc + 4; // As: 4
+    if (c.valeur === 13) return acc + 3; // Roi: 3
+    if (c.valeur === 12) return acc + 2; // Dame: 2
+    if (c.valeur === 11) return acc + 1; // Valet: 1
+    return acc;
+  }, 0);
+
+  // Analyse distribution
+  const repart: Record<string, number> = { [Couleur.PIQUE]: 0, [Couleur.COEUR]: 0, [Couleur.CARREAU]: 0, [Couleur.TREFLE]: 0 };
+  main.forEach(c => repart[c.couleur]++);
+
+  let meilleureCol = Couleur.PIQUE;
+  let nbAtouts = 0;
+  Object.entries(repart).forEach(([col, nb]) => {
+    if (nb > nbAtouts) {
+      nbAtouts = nb;
+      meilleureCol = col as Couleur;
+    }
+  });
+
+  // Bonus distribution : +1 par carte au-delà de 4 dans la couleur la plus longue
+  const bonusDistrib = Math.max(0, nbAtouts - 4) * 2;
+
+  // Malus chicane/singleton pour les jeux à l'atout
+  let bonusVides = 0;
+  Object.values(repart).forEach(nb => {
+    if (nb === 0) bonusVides += 3; // Chicane
+    if (nb === 1) bonusVides += 1; // Singleton
+  });
+
+  return {
+    force: forceBrute + bonusDistrib + bonusVides,
+    meilleureCol,
+    nbAtouts
+  };
+}
+
 export function choisirEnchere(
   main: Carte[],
   variante: VariantConfig,
@@ -291,13 +332,14 @@ export function choisirEnchere(
   joueurId: number,
   preferenceCouleurs?: Couleur[],
 ): DecisionEnchere {
+  const { force, meilleureCol, nbAtouts } = evaluerForceAvancee(main);
+  const currentPriorite = meilleureEnchere?.priorite ?? -1;
+
   if (variante.id === 'whist-gand') {
     const nbAs = main.filter(c => c.valeur === 14).length;
-    const currentPriorite = meilleureEnchere?.priorite ?? -1;
-    const forceTotale = evaluerForceMain(main);
 
-    // Un "Trou" demande 9 plis. Avec 3 As, il faut un peu de force à côté.
-    if (nbAs === 3 && currentPriorite < 2 && forceTotale >= 11.5) {
+    // "Trou" (9 plis avec partenaire imposé)
+    if (nbAs === 3 && currentPriorite < 2 && force >= 18) {
       const asPossedes = main.filter(c => c.valeur === 14).map(c => c.couleur);
       const asManquant = [Couleur.PIQUE, Couleur.COEUR, Couleur.CARREAU, Couleur.TREFLE]
         .find(col => !asPossedes.includes(col));
@@ -320,64 +362,61 @@ export function choisirEnchere(
     }
   }
 
-  const force = evaluerForceMain(main);
-  const { couleur: meilleureCol } = couleurLaPlusLongue(main, preferenceCouleurs);
-  const nbAtouts = cartesParCouleur(main, meilleureCol).length;
-
   const seuils = {
-    facile:  { demande: 14, solo: 20, abondance: 30, misere: -1 },
-    moyen:   { demande: 13, solo: 18, abondance: 27, misere: 1  },
-    expert:  { demande: 12, solo: 17, abondance: 26, misere: 1  },
+    facile:  { propose: 18, solo: 28, abondance: 38, misere: 2 },
+    moyen:   { propose: 16, solo: 25, abondance: 34, misere: 4 },
+    expert:  { propose: 14, solo: 22, abondance: 30, misere: 6 },
   }[niveau];
 
   const contratsDisponibles = variante.contrats.filter(c =>
     c.id !== 'passe' &&
-    c.priorite > (meilleureEnchere?.priorite ?? 0) &&
+    c.priorite > (currentPriorite) &&
     (!c.disponibleSi || c.disponibleSi(main, meilleureEnchere as any, joueurId))
   );
 
-  const nbGrossesCartes = main.filter(c => c.valeur >= 11).length;
-  // Misère : on évite si on a des As ou Rois, et on durcit le seuil de force
-  const aAsOuRoi = main.some(c => c.valeur >= 13);
-  const peutMisere = force <= (seuils.misere + 5) && nbGrossesCartes <= 1 && !aAsOuRoi && !main.some(c => c.estJoker);
+  // --- ANALYSE DE SÉCURITÉ (Anti-Suicide) ---
+  const asAtout = main.some(c => c.couleur === meilleureCol && c.valeur === 14);
+  const roiAtout = main.some(c => c.couleur === meilleureCol && c.valeur === 13);
+  const aHonneurAtout = asAtout || roiAtout;
+
+  // Logique Misère : Plus stricte
+  const grossesCartes = main.filter(c => c.valeur >= 10);
+  const estDangereuxMisere = grossesCartes.some(gc => {
+      const memeCouleur = main.filter(c => c.couleur === gc.couleur);
+      return gc.valeur >= 11 && memeCouleur.length <= 3; // Un Valet mal protégé est fatal
+  });
+  const peutMisere = force <= seuils.misere && !estDangereuxMisere && main.filter(c=>c.valeur >= 13).length === 0;
 
   let contratChoisi: ContratConfig | null = null;
 
-  if (force >= seuils.abondance && nbAtouts >= 7) {
-    contratChoisi = contratsDisponibles.find(c =>
-      c.id === 'abondance' || c.id === 'abondance_declaree',
-    ) ?? null;
-  } else if (force >= seuils.solo && nbAtouts >= 5) {
+  if (force >= seuils.abondance && nbAtouts >= 7 && aHonneurAtout) {
+    contratChoisi = contratsDisponibles.find(c => c.id === 'abondance' || c.id === 'abondance_declaree') ?? null;
+  }
+  else if (force >= seuils.solo && nbAtouts >= 5 && aHonneurAtout) {
     contratChoisi = contratsDisponibles.find(c => c.id === 'solo') ?? null;
-  } else if (peutMisere) {
+  }
+  else if (peutMisere) {
     contratChoisi = contratsDisponibles.find(c => c.id === 'misere' || c.id === 'misere_ouverte') ?? null;
-  } else if (meilleureEnchere?.id === 'propose') {
-    // Cas spécial Emballage : l'IA regarde si elle a du jeu dans la couleur proposée
+  }
+  else if (meilleureEnchere?.id === 'propose') {
     const colProposee = meilleureEnchere.atout!;
-    const nbAtoutsCol = cartesParCouleur(main, colProposee).length;
-    const forceCol = cartesParCouleur(main, colProposee).reduce((acc, c) => acc + (c.valeur >= 11 ? 1 : 0), 0);
-
-    // Si l'IA a au moins 3 atouts OU 2 atouts dont un gros, elle emballe
-    if (nbAtoutsCol >= 3 || (nbAtoutsCol >= 2 && forceCol >= 1)) {
+    const cartesCol = main.filter(c => c.couleur === colProposee);
+    // Emballage : On ne suit que si on a vraiment de quoi aider (As, Roi ou 4 cartes)
+    const aGrosHonneur = cartesCol.some(c => c.valeur >= 13);
+    if (cartesCol.length >= 4 || (cartesCol.length >= 2 && aGrosHonneur)) {
         contratChoisi = contratsDisponibles.find(c => c.id === 'emballe') ?? null;
     }
-  } else if (force >= (seuils.demande - 2)) { // L'IA est plus encline à proposer pour trouver un partenaire
+  }
+  else if (force >= seuils.propose && nbAtouts >= 5) {
     contratChoisi = contratsDisponibles.find(c => c.id === 'propose') ?? null;
   }
 
   if (!contratChoisi) return { action: 'passe' };
 
+  // Détermination du partenaire (As demandé)
   let asPartenaire: string | undefined;
-  if (contratChoisi.id === 'emballe' && meilleureEnchere?.id === 'propose') {
-    return {
-      action: 'enchere',
-      contratId: 'emballe',
-      atout: meilleureEnchere.atout,
-    };
-  }
-
   if (contratChoisi.partenaire) {
-    const asDispo = main.filter(c => c.valeur === 14);
+    const asDispo = main.filter(c => c.valeur === Valeur.AS);
     const asAbsent = [Couleur.PIQUE, Couleur.COEUR, Couleur.CARREAU, Couleur.TREFLE]
       .find(col => !asDispo.some(c => c.couleur === col));
     asPartenaire = asAbsent ? `14_${asAbsent}` : undefined;

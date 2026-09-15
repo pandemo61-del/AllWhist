@@ -59,5 +59,5 @@ const styles = StyleSheet.create({
   sel: { borderColor: '#1D9E75', borderWidth: 2.5 },
   topContainer: { alignItems: 'flex-start', paddingLeft: 1, paddingTop: 1 },
   val: { fontWeight: '900', textAlign: 'left', letterSpacing: -1 },
-  center: { ...StyleSheet.absoluteFillObject, justifyContent: 'center', alignItems: 'center', zIndex: -1 },
+  center: { ...StyleSheet.absoluteFill, justifyContent: 'center', alignItems: 'center', zIndex: -1 },
 });

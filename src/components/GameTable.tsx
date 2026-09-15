@@ -291,7 +291,7 @@ const styles = StyleSheet.create({
     elevation: 10,
   },
   pliOverlayInternal: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     justifyContent: 'center',
     alignItems: 'center',
     zIndex: 1000,
@@ -333,10 +333,10 @@ const styles = StyleSheet.create({
   pName: { fontSize: 11, fontWeight: 'bold', color: '#78909c' },
   pScore: { fontSize: 10, color: '#455a64', fontWeight: 'bold' },
   pScoreHum: { fontSize: 14, color: Colors.primary },
-  overlay: { ...StyleSheet.absoluteFillObject, justifyContent: 'center', alignItems: 'center', zIndex: 50 },
-  pliOverlay: { position: 'absolute', ...StyleSheet.absoluteFillObject, justifyContent: 'center', alignItems: 'center', zIndex: 100, overflow: 'visible' },
+  overlay: { ...StyleSheet.absoluteFill, justifyContent: 'center', alignItems: 'center', zIndex: 50 },
+  pliOverlay: { position: 'absolute', ...StyleSheet.absoluteFill, justifyContent: 'center', alignItems: 'center', zIndex: 100, overflow: 'visible' },
   pliOverlayGlobal: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     zIndex: 9999,
     elevation: 25,
     pointerEvents: 'none',

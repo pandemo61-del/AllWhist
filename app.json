@@ -18,35 +18,32 @@
       "bundleIdentifier": "com.allwhist.app"
     },
     "android": {
-      "compileSdk": 36,
-      "targetSdk": 36,
-      "buildToolsVersion": "36.0.0",
-      "adaptiveIcon": {
-        "foregroundImage": "./assets/allwhist_adaptive_108x108.png",
-        "backgroundColor": "#ffffff"
-      },
       "package": "com.allwhist.app",
       "versionCode": 6,
-      "use16KBPages": true,
-      "softwareKeyboardLayoutMode": "adjustResize",
-      "statusBar": {
-        "hidden": false,
-        "translucent": true
-      },
-      "navigationBar": {
-        "visible": "sticky-immersive",
+      "softwareKeyboardLayoutMode": "resize",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/allwhist_adaptive_108x108.png",
         "backgroundColor": "#ffffff"
       }
     },
     "plugins": [
       "expo-router",
       [
+        "expo-build-properties",
+        {
+          "android": {
+            "compileSdkVersion": 36,
+            "targetSdkVersion": 36,
+            "buildToolsVersion": "36.0.0",
+            "ndkVersion": "27.1.12297006"
+          }
+        }
+      ],
+      [
         "react-native-google-mobile-ads",
         {
           "androidAppId": "ca-app-pub-4266277576724378~1345148479",
-          "android_app_id": "ca-app-pub-4266277576724378~1345148479",
-          "iosAppId": "ca-app-pub-3940256099942544~4411468910",
-          "ios_app_id": "ca-app-pub-3940256099942544~4411468910"
+          "iosAppId": "REPLACE_WITH_YOUR_REAL_IOS_ADMOB_APP_ID"
         }
       ]
     ],

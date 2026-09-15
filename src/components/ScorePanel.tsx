@@ -418,7 +418,7 @@ const mancheStyles = StyleSheet.create({
   expertIconError: { backgroundColor: Colors.error },
   expertIconWarn: { backgroundColor: Colors.warning },
   expertIconGood: { backgroundColor: Colors.primary },
-  expertOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center', zIndex: 1000 },
+  expertOverlay: { ...StyleSheet.absoluteFill, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center', zIndex: 1000 },
   expertCard: { width: '80%', backgroundColor: '#fff', borderRadius: Radius.lg, padding: Spacing.lg, alignItems: 'center', elevation: 5 },
   expertTitre: { fontSize: FontSize.md, fontWeight: FontWeight.bold, textAlign: 'center', marginBottom: Spacing.sm },
   expertDesc: { fontSize: FontSize.sm, color: Colors.textSecondary, textAlign: 'center', lineHeight: 20, marginBottom: Spacing.lg },
