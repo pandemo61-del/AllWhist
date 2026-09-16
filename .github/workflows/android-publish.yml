@@ -116,7 +116,7 @@ jobs:
         run: |
           START=$(date +%s)
 
-          npm ci --legacy-peer-deps
+          npm install --legacy-peer-deps
 
           END=$(date +%s)
           echo "- npm ci: $((END - START)) seconds" >> "$GITHUB_STEP_SUMMARY"
@@ -126,7 +126,7 @@ jobs:
           START=$(date +%s)
           
           # Utilisation de la version stable d'Expo générée
-          npx expo prebuild --platform android --no-install
+          npx expo prebuild --platform android --clean --no-install
           
           END=$(date +%s)
           echo "- Expo prebuild: $((END - START)) seconds" >> "$GITHUB_STEP_SUMMARY"
@@ -352,8 +352,6 @@ jobs:
             -Pversion=${{ env.APP_VERSION_NAME }} \
             --build-cache \
             --parallel \
-            --configure-on-demand \
-            --profile \
             --stacktrace 2>&1 | tee build.log
 
           END=$(date +%s)
