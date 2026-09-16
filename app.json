@@ -3,20 +3,20 @@
     "name": "allWhist",
     "slug": "allwhist",
     "version": "1.1.0",
+
     "orientation": "default",
     "scheme": "allwhist",
+
     "userInterfaceStyle": "dark",
     "backgroundColor": "#ffffff",
+
     "icon": "./assets/allwhist_icon_512x512.png",
-    "splash": {
-      "image": "./assets/allwhist_splash_1280x720.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#ffffff"
-    },
+
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "com.allwhist.app"
     },
+
     "android": {
       "package": "com.allwhist.app",
       "versionCode": 6,
@@ -26,8 +26,19 @@
         "backgroundColor": "#ffffff"
       }
     },
+
     "plugins": [
       "expo-router",
+
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/allwhist_splash_1280x720.png",
+          "backgroundColor": "#ffffff",
+          "resizeMode": "contain"
+        }
+      ],
+
       [
         "expo-build-properties",
         {
@@ -39,14 +50,16 @@
           }
         }
       ],
+
       [
         "react-native-google-mobile-ads",
         {
           "androidAppId": "ca-app-pub-4266277576724378~1345148479",
-          "iosAppId": "REPLACE_WITH_YOUR_REAL_IOS_ADMOB_APP_ID"
+          "iosAppId": "ca-app-pub-4266277576724378~1345148479"
         }
       ]
     ],
+
     "experiments": {
       "typedRoutes": true
     }

@@ -1,473 +1,105 @@
-name: Android full Publish
+name: Android Production Build
 
 on:
   workflow_dispatch:
-    inputs:
-      force_track:
-        description: 'Track à utiliser: internal, beta, production'
-        required: true
-        default: 'internal'
-        type: choice
-        options:
-          - internal
-          - beta
-          - production
-
-  push:
-    branches:
-      - main
-
-permissions:
-  contents: read
-  actions: write
-
-concurrency:
-  group: android-publish-${{ github.ref }}
-  cancel-in-progress: false
 
 jobs:
-  publish:
+  build-and-publish:
     runs-on: ubuntu-latest
-    timeout-minutes: 60
-
-    # Déploiement automatique uniquement si le commit contient un marqueur explicite.
-    # En manuel, workflow_dispatch est toujours autorisé.
-    if: |
-      github.event_name == 'workflow_dispatch' ||
-      (
-        github.event_name == 'push' &&
-        github.event.head_commit != null &&
-        (
-          contains(github.event.head_commit.message, 'Publish Internal') ||
-          contains(github.event.head_commit.message, 'Publish Beta') ||
-          contains(github.event.head_commit.message, 'Publish Production')
-        )
-      )
 
     env:
-      GRADLE_OPTS: -Dorg.gradle.jvmargs="-Xmx4096m -XX:MaxMetaspaceSize=1024m"
-      PLAY_TRACKS_TO_CHECK: internal,beta,production
-      ENABLE_PLAY_STORE_PUBLISH: true
+      APP_MODULE: app
 
     steps:
-      - name: Start Workflow Timer
-        run: |
-          echo "WORKFLOW_START=$(date +%s)" >> "$GITHUB_ENV"
-          echo "## Android Publish timing" >> "$GITHUB_STEP_SUMMARY"
-
-      - name: Checkout repository
+      - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Check Artifact Storage Quota
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          echo "### 📦 Artifact Storage Check" >> "$GITHUB_STEP_SUMMARY"
-          
-          # On utilise '|| true' pour ne pas faire échouer le build si l'API GitHub est indisponible
-          USAGE_JSON=$(gh api repos/${{ github.repository }}/actions/storage/usage || echo '{"inventory":{"artifact_usage_in_bytes":0}}')
-          ARTIFACT_USAGE_BYTES=$(echo $USAGE_JSON | jq -r '.inventory.artifact_usage_in_bytes // 0')
-          
-          USAGE_MB=$((ARTIFACT_USAGE_BYTES / 1024 / 1024))
-          
-          echo "- Current artifact storage usage: **${USAGE_MB} MB**" >> "$GITHUB_STEP_SUMMARY"
-
-          if [ "$USAGE_MB" -gt 400 ]; then
-            echo "⚠️ Storage quota is high ($USAGE_MB MB / 500 MB). Cleaning up old artifacts..." >> "$GITHUB_STEP_SUMMARY"
-            
-            # Récupérer et supprimer les artefacts de plus de 3 jours
-            # On ignore les erreurs si aucun artefact n'est trouvé
-            gh api repos/${{ github.repository }}/actions/artifacts \
-              --paginate -q '.artifacts[] | select(.created_at < "'$(date -d '3 days ago' --iso-8601=seconds)'") | .id' \
-              | xargs -I {} gh api -X DELETE repos/${{ github.repository }}/actions/artifacts/{} || true
-            
-            echo "✅ Cleanup attempted." >> "$GITHUB_STEP_SUMMARY"
-          else
-            echo "✅ Storage quota is healthy." >> "$GITHUB_STEP_SUMMARY"
-          fi
-
-      - name: Resolve Target Track
-        run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            TRACK="${{ github.event.inputs.force_track }}"
-          elif echo "${{ github.event.head_commit.message }}" | grep -q "Publish Production"; then
-            TRACK="production"
-          elif echo "${{ github.event.head_commit.message }}" | grep -q "Publish Beta"; then
-            TRACK="beta"
-          else
-            TRACK="internal"
-          fi
-
-          echo "TRACK=$TRACK" >> "$GITHUB_ENV"
-          echo "- Target track: \`$TRACK\`" >> "$GITHUB_STEP_SUMMARY"
-
-      - name: Set up JDK 17
-        uses: actions/setup-java@v5
-        with:
-          distribution: temurin
-          java-version: '17'
-
-      - name: Setup Node.js
+      - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: '22'
+          node-version: 22
+          cache: npm
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
 
       - name: Install dependencies
+        run: npm ci
+
+      - name: Verify Expo dependencies
+        run: npx expo install --check
+
+      - name: Decode keystore
         run: |
-          START=$(date +%s)
-
-          npm install --legacy-peer-deps
-
-          END=$(date +%s)
-          echo "- npm ci: $((END - START)) seconds" >> "$GITHUB_STEP_SUMMARY"
-
-      - name: Prebuild Android
-        run: |
-          START=$(date +%s)
-          
-          # Utilisation de la version stable d'Expo générée
-          npx expo prebuild --platform android --clean --no-install
-          
-          END=$(date +%s)
-          echo "- Expo prebuild: $((END - START)) seconds" >> "$GITHUB_STEP_SUMMARY"
-
-      - name: Display Gradle signing config
-        run: |
-          echo "===== build.gradle ====="
-          sed -n '/signingConfigs/,/buildTypes/p' android/app/build.gradle || true
-            
-            - name: Read App Version From app.json
-              run: |
-                START=$(date +%s)
-      
-                VERSION_CODE=$(node -e "
-                  const app = require('./app.json');
-      
-                  const versionCode = app.expo?.android?.versionCode;
-                  if (!versionCode) {
-                    console.error('Missing expo.android.versionCode in app.json');
-                    process.exit(1);
-                  }
-      
-                  if (!Number.isInteger(versionCode) || versionCode < 1) {
-                    console.error('expo.android.versionCode must be a positive integer');
-                    process.exit(1);
-                  }
-      
-                  console.log(versionCode);
-                ")
-      
-                APP_PACKAGE=$(node -e "
-                  const app = require('./app.json');
-      
-                  const packageName = app.expo?.android?.package;
-                  if (!packageName) {
-                    console.error('Missing expo.android.package in app.json');
-                    process.exit(1);
-                  }
-      
-                  console.log(packageName);
-                ")
-      
-                APP_VERSION_NAME=$(node -e "
-                  const app = require('./app.json');
-                  console.log(app.expo?.version || 'unknown');
-                ")
-      
-                echo "VERSION_CODE=$VERSION_CODE" >> "$GITHUB_ENV"
-                echo "APP_PACKAGE=$APP_PACKAGE" >> "$GITHUB_ENV"
-                echo "APP_VERSION_NAME=$APP_VERSION_NAME" >> "$GITHUB_ENV"
-      
-                END=$(date +%s)
-      
-                echo "- app.json read: $((END - START)) seconds" >> "$GITHUB_STEP_SUMMARY"
-                echo "- Package: \`$APP_PACKAGE\`" >> "$GITHUB_STEP_SUMMARY"
-                echo "- Version name: \`$APP_VERSION_NAME\`" >> "$GITHUB_STEP_SUMMARY"
-                echo "- Version code: \`$VERSION_CODE\`" >> "$GITHUB_STEP_SUMMARY"
-
-      - name: Force release signing
-        run: |
-          sed -i 's/signingConfig signingConfigs.debug/signingConfig signingConfigs.release/g' android/app/build.gradle
-
-      - name: Create release signing config
-        run: |
-          perl -0pi -e 's/signingConfigs\s*\{\s*debug\s*\{.*?\}\s*\}/signingConfigs {\n        debug {\n            storeFile file('\''debug.keystore'\'')\n            storePassword '\''android'\''\n            keyAlias '\''androiddebugkey'\''\n            keyPassword '\''android'\''\n        }\n\n        release {\n            storeFile file('\''keystore.jks'\'')\n            storePassword MYAPP_RELEASE_STORE_PASSWORD\n            keyAlias MYAPP_RELEASE_KEY_ALIAS\n            keyPassword MYAPP_RELEASE_KEY_PASSWORD\n        }\n    }/s' android/app/build.gradle
-
-      - name: Validate Google Play Service Account Secret
-        env:
-          GOOGLE_PLAY_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON }}
-        run: |
-          START=$(date +%s)
-
-          if [ -z "$GOOGLE_PLAY_SERVICE_ACCOUNT_JSON" ]; then
-            echo "GOOGLE_PLAY_SERVICE_ACCOUNT_JSON secret is empty"
-            exit 1
-          fi
-
-          printf '%s' "$GOOGLE_PLAY_SERVICE_ACCOUNT_JSON" > /tmp/google-play-service-account.json
-
-          jq . /tmp/google-play-service-account.json > /dev/null
-
-          CLIENT_EMAIL=$(jq -r '.client_email' /tmp/google-play-service-account.json)
-
-          if [ -z "$CLIENT_EMAIL" ] || [ "$CLIENT_EMAIL" = "null" ]; then
-            echo "client_email is missing in GOOGLE_PLAY_SERVICE_ACCOUNT_JSON"
-            exit 1
-          fi
-
-          END=$(date +%s)
-
-          echo "- Google Play service account JSON validation: $((END - START)) seconds" >> "$GITHUB_STEP_SUMMARY"
-          echo "- Google Play service account: \`$CLIENT_EMAIL\`" >> "$GITHUB_STEP_SUMMARY"
-
-      - name: Setup Ruby for Fastlane
-        uses: ruby/setup-ruby@v1
-        with:
-          ruby-version: '3.3'
-
-      - name: Install Fastlane
-        run: |
-          START=$(date +%s)
-
-          gem install fastlane --no-document
-
-          END=$(date +%s)
-          echo "- Fastlane install: $((END - START)) seconds" >> "$GITHUB_STEP_SUMMARY"
-
-      - name: Check Version Code Against Google Play
-        env:
-          GOOGLE_PLAY_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON }}
-        run: |
-          START=$(date +%s)
-
-          printf '%s' "$GOOGLE_PLAY_SERVICE_ACCOUNT_JSON" > /tmp/google-play-service-account.json
-
-          mkdir -p fastlane
-
-          cat > fastlane/Fastfile <<'RUBY'
-          default_platform(:android)
-
-          platform :android do
-            desc "Block release if app.json versionCode already exists on Google Play"
-            lane :check_version_code do
-              current_version_code = ENV.fetch("VERSION_CODE").to_i
-              package_name = ENV.fetch("APP_PACKAGE")
-              json_key = "/tmp/google-play-service-account.json"
-              tracks = ENV.fetch("PLAY_TRACKS_TO_CHECK", "internal,beta,production").split(",").map(&:strip)
-
-              UI.message("Checking versionCode #{current_version_code} for package #{package_name}")
-              UI.message("Tracks checked: #{tracks.join(', ')}")
-
-              existing_version_codes = []
-
-              tracks.each do |track|
-                UI.message("Reading Google Play track: #{track}")
-
-                codes = google_play_track_version_codes(
-                  package_name: package_name,
-                  track: track,
-                  json_key: json_key
-                )
-
-                codes = Array(codes).map(&:to_i)
-                UI.message("Track #{track}: #{codes.empty? ? 'no version codes found' : codes.join(', ')}")
-
-                existing_version_codes.concat(codes)
-              end
-
-              existing_version_codes = existing_version_codes.uniq.sort
-              highest_version_code = existing_version_codes.max || 0
-
-              UI.message("Existing Google Play version codes: #{existing_version_codes.join(', ')}")
-              UI.message("Highest Google Play versionCode: #{highest_version_code}")
-
-              if existing_version_codes.include?(current_version_code)
-                UI.user_error!("Blocked: versionCode #{current_version_code} already exists on Google Play.")
-              end
-
-              if current_version_code <= highest_version_code
-                UI.user_error!("Blocked: app.json versionCode #{current_version_code} must be greater than highest Google Play versionCode #{highest_version_code}.")
-              end
-
-              UI.success("OK: app.json versionCode #{current_version_code} is valid for Google Play.")
-            end
-          end
-          RUBY
-
-          fastlane android check_version_code
-
-          END=$(date +%s)
-          echo "- Google Play versionCode check: $((END - START)) seconds" >> "$GITHUB_STEP_SUMMARY"
-
-      - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v6
-        with:
-          gradle-version: wrapper
-          cache-read-only: false
-
-      - name: Decode Google Services JSON
-        env:
-          GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
-        run: |
-          START=$(date +%s)
-
-          if [ -z "$GOOGLE_SERVICES_JSON" ]; then
-            echo "GOOGLE_SERVICES_JSON secret is empty"
-            exit 1
-          fi
-
           mkdir -p android/app
+          echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 -d > android/app/keystore.jks
 
-          if printf '%s' "$GOOGLE_SERVICES_JSON" | base64 --decode > android/app/google-services.json 2>/dev/null; then
-            if ! jq . android/app/google-services.json > /dev/null 2>&1; then
-              printf '%s' "$GOOGLE_SERVICES_JSON" > android/app/google-services.json
-            fi
-          else
-            printf '%s' "$GOOGLE_SERVICES_JSON" > android/app/google-services.json
-          fi
-
-          jq . android/app/google-services.json > /dev/null
-
-          END=$(date +%s)
-          echo "- google-services.json decode: $((END - START)) seconds" >> "$GITHUB_STEP_SUMMARY"
-
-      - name: Decode Keystore
-        env:
-          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+      - name: Validate keystore fingerprint
         run: |
-          START=$(date +%s)
-
-          if [ -z "$KEYSTORE_BASE64" ]; then
-            echo "KEYSTORE_BASE64 secret is empty"
-            exit 1
-          fi
-
-          printf '%s' "$KEYSTORE_BASE64" | base64 --decode > android/app/keystore.jks
-
-          if [ ! -s android/app/keystore.jks ]; then
-            echo "Decoded keystore is empty"
-            exit 1
-          fi
-
-          END=$(date +%s)
-          echo "- keystore decode: $((END - START)) seconds" >> "$GITHUB_STEP_SUMMARY"
-
-      - name: Create release signing properties
-        run: |
-          cat > android/keystore.properties << EOF
-          MYAPP_RELEASE_STORE_FILE=keystore.jks
-          MYAPP_RELEASE_KEY_ALIAS=${{ secrets.KEY_ALIAS }}
-          MYAPP_RELEASE_STORE_PASSWORD=${{ secrets.KEYSTORE_PASSWORD }}
-          MYAPP_RELEASE_KEY_PASSWORD=${{ secrets.KEY_PASSWORD }}
-          EOF
-     
-      - name: Show keystore fingerprint
-        run: |
-          keytool -list -v \
+          FINGERPRINT=$(keytool -list -v \
             -keystore android/app/keystore.jks \
             -alias "${{ secrets.KEY_ALIAS }}" \
             -storepass "${{ secrets.KEYSTORE_PASSWORD }}" \
-            | grep -E "SHA1:|SHA256:"
-            
-      - name: Make gradlew executable
-        run: chmod +x gradlew
-        working-directory: android
+            | grep "SHA256:" \
+            | head -1 \
+            | sed 's/.*SHA256: //' \
+            | tr -d ' ')
 
-      - name: Build Release Bundle
-        run: |
-          START=$(date +%s)
+          echo "Fingerprint: $FINGERPRINT"
 
-          ./gradlew bundleRelease \
-            -PversionCode=${{ env.VERSION_CODE }} \
-            -Pversion=${{ env.APP_VERSION_NAME }} \
-            --build-cache \
-            --parallel \
-            --stacktrace 2>&1 | tee build.log
-
-          END=$(date +%s)
-          echo "- Gradle bundleRelease: $((END - START)) seconds" >> "$GITHUB_STEP_SUMMARY"
-        working-directory: android
-        env:
-          MYAPP_RELEASE_STORE_FILE: keystore.jks
-          MYAPP_RELEASE_KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
-          MYAPP_RELEASE_STORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
-          MYAPP_RELEASE_KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
-
-      - name: Upload Build Logs
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: build-logs-${{ env.VERSION_CODE }}
-          path: |
-            android/build.log
-            android/build/reports/
-            android/app/build/reports/
-            **/build/reports/
-            **/build/test-results/
-            android/build/outputs/logs/
-          retention-days: 7
-
-      - name: Rename AAB Artifact
-        run: |
-          AAB_SOURCE="android/app/build/outputs/bundle/release/app-release.aab"
-          AAB_TARGET="android/app/build/outputs/bundle/release/allwhist-${VERSION_CODE}.aab"
-
-          if [ ! -f "$AAB_SOURCE" ]; then
-            echo "AAB not found at $AAB_SOURCE"
+          if [ "$FINGERPRINT" != "${{ secrets.EXPECTED_SHA256 }}" ]; then
+            echo "Wrong keystore detected"
             exit 1
           fi
 
-          mv "$AAB_SOURCE" "$AAB_TARGET"
-
-          echo "AAB_PATH=$AAB_TARGET" >> "$GITHUB_ENV"
-
-      - name: Upload Artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: app-release-files-${{ env.VERSION_CODE }}
-          path: |
-            android/app/build/outputs/bundle/release/allwhist-${{ env.VERSION_CODE }}.aab
-            android/app/build/outputs/mapping/release/mapping.txt
-          retention-days: 14
-
-      - name: Upload Gradle Profile Report
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: gradle-profile-${{ env.VERSION_CODE }}
-          path: android/build/reports/profile/
-          retention-days: 14
-
-      - name: Publish to Google Play - Internal or Beta
-        if: env.ENABLE_PLAY_STORE_PUBLISH == 'true' && env.TRACK != 'production'
-        uses: r0adkll/upload-google-play@v1
-        with:
-          serviceAccountJsonPlainText: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON }}
-          packageName: ${{ env.APP_PACKAGE }}
-          releaseFiles: android/app/build/outputs/bundle/release/allwhist-${{ env.VERSION_CODE }}.aab
-          track: ${{ env.TRACK }}
-          status: completed
-          releaseName: ${{ env.APP_VERSION_NAME }} (${{ env.VERSION_CODE }})
-          mappingFile: android/app/build/outputs/mapping/release/mapping.txt
-
-      - name: Publish to Google Play - Production staged rollout
-        if: env.ENABLE_PLAY_STORE_PUBLISH == 'true' && env.TRACK == 'production'
-        uses: r0adkll/upload-google-play@v1
-        with:
-          serviceAccountJsonPlainText: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON }}
-          packageName: ${{ env.APP_PACKAGE }}
-          releaseFiles: android/app/build/outputs/bundle/release/allwhist-${{ env.VERSION_CODE }}.aab
-          track: production
-          status: inProgress
-          userFraction: 0.10
-          releaseName: ${{ env.APP_VERSION_NAME }} (${{ env.VERSION_CODE }})
-          mappingFile: android/app/build/outputs/mapping/release/mapping.txt
-
-      - name: Show Total Workflow Duration
-        if: always()
+      - name: Create signing properties
         run: |
-          END=$(date +%s)
+          cat <<EOF > android/keystore.properties
+          storeFile=keystore.jks
+          storePassword=${{ secrets.KEYSTORE_PASSWORD }}
+          keyAlias=${{ secrets.KEY_ALIAS }}
+          keyPassword=${{ secrets.KEY_PASSWORD }}
+          EOF
 
-          if [ -n "${WORKFLOW_START:-}" ]; then
-            echo "- Total workflow duration: $((END - WORKFLOW_START)) seconds" >> "$GITHUB_STEP_SUMMARY"
-          fi
+      - name: Verify signing config exists
+        run: |
+          grep -q "signingConfigs.release" android/app/build.gradle
+
+      - name: Clean Android
+        run: |
+          cd android
+          ./gradlew clean
+
+      - name: Build production AAB
+        run: |
+          cd android
+          ./gradlew bundleRelease --no-daemon
+
+      - name: Verify AAB generated
+        run: |
+          test -f android/app/build/outputs/bundle/release/app-release.aab
+
+      - name: Validate final signature
+        run: |
+          jarsigner -verify \
+            -verbose \
+            -certs \
+            android/app/build/outputs/bundle/release/app-release.aab
+
+      - name: Upload AAB artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: allwhist-production-aab
+          path: android/app/build/outputs/bundle/release/app-release.aab
+
+      - name: Publish Internal Testing
+        uses: r0adkll/upload-google-play@v1
+        with:
+          serviceAccountJsonPlainText: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT }}
+          packageName: com.allwhist.app
+          releaseFiles: android/app/build/outputs/bundle/release/app-release.aab
+          track: internal
+          status: completed
