@@ -189,6 +189,10 @@ jobs:
         run: |
           sed -i 's/signingConfig signingConfigs.debug/signingConfig signingConfigs.release/g' android/app/build.gradle
 
+      - name: Create release signing config
+        run: |
+          perl -0pi -e 's/signingConfigs\s*\{\s*debug\s*\{.*?\}\s*\}/signingConfigs {\n        debug {\n            storeFile file('\''debug.keystore'\'')\n            storePassword '\''android'\''\n            keyAlias '\''androiddebugkey'\''\n            keyPassword '\''android'\''\n        }\n\n        release {\n            storeFile file('\''keystore.jks'\'')\n            storePassword MYAPP_RELEASE_STORE_PASSWORD\n            keyAlias MYAPP_RELEASE_KEY_ALIAS\n            keyPassword MYAPP_RELEASE_KEY_PASSWORD\n        }\n    }/s' android/app/build.gradle
+
       - name: Validate Google Play Service Account Secret
         env:
           GOOGLE_PLAY_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON }}
@@ -356,37 +360,7 @@ jobs:
           MYAPP_RELEASE_STORE_PASSWORD=${{ secrets.KEYSTORE_PASSWORD }}
           MYAPP_RELEASE_KEY_PASSWORD=${{ secrets.KEY_PASSWORD }}
           EOF
-
-      - name: Patch build.gradle for release signing
-        run: |
-          python3 << 'PY'
-          from pathlib import Path
-      
-          f = Path("android/app/build.gradle")
-          text = f.read_text()
-      
-          if "signingConfigs {" in text and "release {" not in text[text.index("signingConfigs {"):]:
-              text = text.replace(
-                  "signingConfigs {",
-                  """
-          signingConfigs {
-              release {
-                  storeFile file(MYAPP_RELEASE_STORE_FILE)
-                  storePassword MYAPP_RELEASE_STORE_PASSWORD
-                  keyAlias MYAPP_RELEASE_KEY_ALIAS
-                  keyPassword MYAPP_RELEASE_KEY_PASSWORD
-              }
-"""
-              )
-      
-          text = text.replace(
-              "signingConfig signingConfigs.debug",
-              "signingConfig signingConfigs.release"
-          )
-      
-          f.write_text(text)
-          PY
-          
+     
       - name: Show keystore fingerprint
         run: |
           keytool -list -v \
