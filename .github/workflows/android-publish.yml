@@ -131,54 +131,63 @@ jobs:
           END=$(date +%s)
           echo "- Expo prebuild: $((END - START)) seconds" >> "$GITHUB_STEP_SUMMARY"
 
-      - name: Read App Version From app.json
+      - name: Display Gradle signing config
         run: |
-          START=$(date +%s)
+          echo "===== build.gradle ====="
+          sed -n '/signingConfigs/,/buildTypes/p' android/app/build.gradle || true
+            
+            - name: Read App Version From app.json
+              run: |
+                START=$(date +%s)
+      
+                VERSION_CODE=$(node -e "
+                  const app = require('./app.json');
+      
+                  const versionCode = app.expo?.android?.versionCode;
+                  if (!versionCode) {
+                    console.error('Missing expo.android.versionCode in app.json');
+                    process.exit(1);
+                  }
+      
+                  if (!Number.isInteger(versionCode) || versionCode < 1) {
+                    console.error('expo.android.versionCode must be a positive integer');
+                    process.exit(1);
+                  }
+      
+                  console.log(versionCode);
+                ")
+      
+                APP_PACKAGE=$(node -e "
+                  const app = require('./app.json');
+      
+                  const packageName = app.expo?.android?.package;
+                  if (!packageName) {
+                    console.error('Missing expo.android.package in app.json');
+                    process.exit(1);
+                  }
+      
+                  console.log(packageName);
+                ")
+      
+                APP_VERSION_NAME=$(node -e "
+                  const app = require('./app.json');
+                  console.log(app.expo?.version || 'unknown');
+                ")
+      
+                echo "VERSION_CODE=$VERSION_CODE" >> "$GITHUB_ENV"
+                echo "APP_PACKAGE=$APP_PACKAGE" >> "$GITHUB_ENV"
+                echo "APP_VERSION_NAME=$APP_VERSION_NAME" >> "$GITHUB_ENV"
+      
+                END=$(date +%s)
+      
+                echo "- app.json read: $((END - START)) seconds" >> "$GITHUB_STEP_SUMMARY"
+                echo "- Package: \`$APP_PACKAGE\`" >> "$GITHUB_STEP_SUMMARY"
+                echo "- Version name: \`$APP_VERSION_NAME\`" >> "$GITHUB_STEP_SUMMARY"
+                echo "- Version code: \`$VERSION_CODE\`" >> "$GITHUB_STEP_SUMMARY"
 
-          VERSION_CODE=$(node -e "
-            const app = require('./app.json');
-
-            const versionCode = app.expo?.android?.versionCode;
-            if (!versionCode) {
-              console.error('Missing expo.android.versionCode in app.json');
-              process.exit(1);
-            }
-
-            if (!Number.isInteger(versionCode) || versionCode < 1) {
-              console.error('expo.android.versionCode must be a positive integer');
-              process.exit(1);
-            }
-
-            console.log(versionCode);
-          ")
-
-          APP_PACKAGE=$(node -e "
-            const app = require('./app.json');
-
-            const packageName = app.expo?.android?.package;
-            if (!packageName) {
-              console.error('Missing expo.android.package in app.json');
-              process.exit(1);
-            }
-
-            console.log(packageName);
-          ")
-
-          APP_VERSION_NAME=$(node -e "
-            const app = require('./app.json');
-            console.log(app.expo?.version || 'unknown');
-          ")
-
-          echo "VERSION_CODE=$VERSION_CODE" >> "$GITHUB_ENV"
-          echo "APP_PACKAGE=$APP_PACKAGE" >> "$GITHUB_ENV"
-          echo "APP_VERSION_NAME=$APP_VERSION_NAME" >> "$GITHUB_ENV"
-
-          END=$(date +%s)
-
-          echo "- app.json read: $((END - START)) seconds" >> "$GITHUB_STEP_SUMMARY"
-          echo "- Package: \`$APP_PACKAGE\`" >> "$GITHUB_STEP_SUMMARY"
-          echo "- Version name: \`$APP_VERSION_NAME\`" >> "$GITHUB_STEP_SUMMARY"
-          echo "- Version code: \`$VERSION_CODE\`" >> "$GITHUB_STEP_SUMMARY"
+      - name: Force release signing
+        run: |
+          sed -i 's/signingConfig signingConfigs.debug/signingConfig signingConfigs.release/g' android/app/build.gradle
 
       - name: Validate Google Play Service Account Secret
         env:
@@ -338,6 +347,16 @@ jobs:
 
           END=$(date +%s)
           echo "- keystore decode: $((END - START)) seconds" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Create release signing properties
+        run: |
+          cat > android/keystore.properties << EOF
+          MYAPP_RELEASE_STORE_FILE=keystore.jks
+          MYAPP_RELEASE_KEY_ALIAS=${{ secrets.KEY_ALIAS }}
+          MYAPP_RELEASE_STORE_PASSWORD=${{ secrets.KEYSTORE_PASSWORD }}
+          MYAPP_RELEASE_KEY_PASSWORD=${{ secrets.KEY_PASSWORD }}
+          EOF
+
           
       - name: Show keystore fingerprint
         run: |
