@@ -357,6 +357,35 @@ jobs:
           MYAPP_RELEASE_KEY_PASSWORD=${{ secrets.KEY_PASSWORD }}
           EOF
 
+      - name: Patch build.gradle for release signing
+        run: |
+          python3 << 'PY'
+          from pathlib import Path
+      
+          f = Path("android/app/build.gradle")
+          text = f.read_text()
+      
+          if "signingConfigs {" in text and "release {" not in text[text.index("signingConfigs {"):]:
+              text = text.replace(
+                  "signingConfigs {",
+                  """
+          signingConfigs {
+              release {
+                  storeFile file(MYAPP_RELEASE_STORE_FILE)
+                  storePassword MYAPP_RELEASE_STORE_PASSWORD
+                  keyAlias MYAPP_RELEASE_KEY_ALIAS
+                  keyPassword MYAPP_RELEASE_KEY_PASSWORD
+              }
+"""
+              )
+      
+          text = text.replace(
+              "signingConfig signingConfigs.debug",
+              "signingConfig signingConfigs.release"
+          )
+      
+          f.write_text(text)
+          PY
           
       - name: Show keystore fingerprint
         run: |
