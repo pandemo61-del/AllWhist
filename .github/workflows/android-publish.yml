@@ -54,15 +54,15 @@ jobs:
       - name: Validate production keystore
         run: |
           FINGERPRINT=$(keytool -list -v \
-            -keystore android/app/keystore.jks \
-            -alias "${{ secrets.KEY_ALIAS }}" \
-            -storepass "${{ secrets.KEYSTORE_PASSWORD }}" \
-            | grep "SHA256:" \
-            | head -1 \
-            | sed 's/.*SHA256: //' \
-            | tr -d ' ')
-
-          EXPECTED=$(echo "${{ secrets.KEYSTORE_SHA256 }}" | tr -d ' ')
+          -keystore android/app/keystore.jks \
+          -alias "${{ secrets.KEY_ALIAS }}" \
+          -storepass "${{ secrets.KEYSTORE_PASSWORD }}" |
+          grep "SHA256:" |
+          head -1 |
+          sed 's/.*SHA256:[[:space:]]*//' |
+          tr -d '[:space:]')
+          
+          EXPECTED=$(echo "${{ secrets.KEYSTORE_SHA256 }}" | tr -d '[:space:]')
 
           echo "Expected fingerprint: $EXPECTED"
           echo "Actual fingerprint  : $FINGERPRINT"
