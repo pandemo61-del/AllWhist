@@ -32,12 +32,20 @@ jobs:
       - name: Verify Expo dependencies
         run: npx expo install --check
 
+      - name: Generate Android project
+        run: npx expo prebuild --platform android --clean
+
+      - name: Decode google-services.json
+        run: |
+          mkdir -p android/app
+          echo '${{ secrets.GOOGLE_SERVICES_JSON }}' > android/app/google-services.json
+
       - name: Decode keystore
         run: |
           mkdir -p android/app
-          echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 -d > android/app/keystore.jks
+          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > android/app/keystore.jks
 
-      - name: Validate keystore fingerprint
+      - name: Validate production keystore
         run: |
           FINGERPRINT=$(keytool -list -v \
             -keystore android/app/keystore.jks \
@@ -48,20 +56,23 @@ jobs:
             | sed 's/.*SHA256: //' \
             | tr -d ' ')
 
-          echo "Fingerprint: $FINGERPRINT"
+          EXPECTED=$(echo "${{ secrets.KEYSTORE_SHA256 }}" | tr -d ' ')
 
-          if [ "$FINGERPRINT" != "${{ secrets.EXPECTED_SHA256 }}" ]; then
-            echo "Wrong keystore detected"
+          echo "Expected fingerprint: $EXPECTED"
+          echo "Actual fingerprint  : $FINGERPRINT"
+
+          if [ "$FINGERPRINT" != "$EXPECTED" ]; then
+            echo "ERROR: Wrong production keystore"
             exit 1
           fi
 
       - name: Create signing properties
         run: |
-          cat <<EOF > android/keystore.properties
-          storeFile=keystore.jks
-          storePassword=${{ secrets.KEYSTORE_PASSWORD }}
-          keyAlias=${{ secrets.KEY_ALIAS }}
-          keyPassword=${{ secrets.KEY_PASSWORD }}
+          cat > android/keystore.properties <<EOF
+          MYAPP_RELEASE_STORE_FILE=keystore.jks
+          MYAPP_RELEASE_KEY_ALIAS=${{ secrets.KEY_ALIAS }}
+          MYAPP_RELEASE_STORE_PASSWORD=${{ secrets.KEYSTORE_PASSWORD }}
+          MYAPP_RELEASE_KEY_PASSWORD=${{ secrets.KEY_PASSWORD }}
           EOF
 
       - name: Verify signing config exists
@@ -69,36 +80,51 @@ jobs:
           grep -q "signingConfigs.release" android/app/build.gradle
 
       - name: Clean Android
-        run: |
-          cd android
-          ./gradlew clean
+        working-directory: android
+        run: ./gradlew clean
 
-      - name: Build production AAB
+      - name: Build Production AAB
+        working-directory: android
+        env:
+          MYAPP_RELEASE_STORE_FILE: keystore.jks
+          MYAPP_RELEASE_KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          MYAPP_RELEASE_STORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          MYAPP_RELEASE_KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         run: |
-          cd android
-          ./gradlew bundleRelease --no-daemon
+          ./gradlew bundleRelease \
+            --no-daemon \
+            --stacktrace
 
       - name: Verify AAB generated
         run: |
           test -f android/app/build/outputs/bundle/release/app-release.aab
 
-      - name: Validate final signature
+      - name: Verify AAB signature
         run: |
           jarsigner -verify \
             -verbose \
             -certs \
             android/app/build/outputs/bundle/release/app-release.aab
 
+      - name: Display signing certificate
+        run: |
+          keytool -list -v \
+            -keystore android/app/keystore.jks \
+            -alias "${{ secrets.KEY_ALIAS }}" \
+            -storepass "${{ secrets.KEYSTORE_PASSWORD }}" \
+            | grep -E "SHA1:|SHA256:"
+
       - name: Upload AAB artifact
         uses: actions/upload-artifact@v4
         with:
           name: allwhist-production-aab
           path: android/app/build/outputs/bundle/release/app-release.aab
+          retention-days: 14
 
       - name: Publish Internal Testing
         uses: r0adkll/upload-google-play@v1
         with:
-          serviceAccountJsonPlainText: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT }}
+          serviceAccountJsonPlainText: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON }}
           packageName: com.allwhist.app
           releaseFiles: android/app/build/outputs/bundle/release/app-release.aab
           track: internal
