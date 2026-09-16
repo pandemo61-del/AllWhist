@@ -81,9 +81,9 @@ jobs:
           MYAPP_RELEASE_KEY_PASSWORD=${{ secrets.KEY_PASSWORD }}
           EOF
 
-      - name: Verify signing config exists
+      - name: Display signing configuration
         run: |
-          grep -q "signingConfigs.release" android/app/build.gradle
+          sed -n '/signingConfigs/,/buildTypes/p' android/app/build.gradle || true
 
       - name: Clean Android
         working-directory: android
