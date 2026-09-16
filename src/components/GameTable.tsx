@@ -6,11 +6,12 @@ import React, { useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, Animated, Dimensions } from 'react-native';
 import { Carte, Couleur, Pli, ContratJoue, Joueur, CartePosee } from '../engine/types';
 import { CardFace, HandBack } from './Card';
-import { SYMBOLE } from '../engine/deck';
-import { Colors, Shadows } from '../constants/theme';
+import { SYMBOLE, estRouge } from '../engine/deck';
+import { Colors, Shadows, FontWeight } from '../constants/theme';
 import { normalize } from '../utils/normalize';
 import { useTranslation } from '../i18n';
 import { getVariante } from '../variants/index';
+import { determinerGagnant } from '../engine/rules';
 
 import { useGameStore } from '../store/gameStore';
 import { DistributionAnimation } from './DistributionAnimation';
@@ -56,13 +57,32 @@ export const GameTable: React.FC<any> = ({
 
   const donneurId = useGameStore.getState().donneur;
 
+  const currentWinnerId = React.useMemo(() => {
+    if (pliEnCours.cartesJouees.length === 0) return undefined;
+    try {
+      return determinerGagnant(pliEnCours, atout);
+    } catch {
+      return undefined;
+    }
+  }, [pliEnCours, atout]);
+
   return (
     <View style={styles.container}>
       {/* ── Badges fixes en haut ── */}
       {!isBidding && (
         <View style={styles.topBadges}>
-          {atout && <View style={styles.badge}><Text style={styles.bTxt}>{SYMBOLE[atout]} Atout</Text></View>}
-          {contrat && <View style={[styles.badge, styles.bContrat]}><Text style={styles.bTxtW}>{contrat.nom}: {nbPlisEq}/{contrat.plisObjectif}</Text></View>}
+          {atout && (
+            <View style={[styles.badge, { borderColor: estRouge(atout) ? Colors.cardRed : Colors.textPrimary }]}>
+              <Text style={[styles.bTxt, { color: estRouge(atout) ? Colors.cardRed : Colors.textPrimary, fontSize: 13 }]}>
+                {SYMBOLE[atout]} Atout
+              </Text>
+            </View>
+          )}
+          {contrat && (
+            <View style={[styles.badge, styles.bContrat]}>
+              <Text style={styles.bTxtW}>{contrat.nom}: {nbPlisEq}/{contrat.plisObjectif}</Text>
+            </View>
+          )}
           <View style={styles.badge}><Text style={styles.bTxt}>Pli {plisTermines.length + 1}/13</Text></View>
         </View>
       )}
@@ -88,6 +108,8 @@ export const GameTable: React.FC<any> = ({
                 isDealer={joueurs[2].id === donneurId}
                 phase={phase}
                 cardsCount={phase === 'distribution' ? cardsReceived[2] : undefined}
+                isCurrentWinner={currentWinnerId === 2}
+                contratId={contrat?.id}
               />
             </View>
 
@@ -104,6 +126,8 @@ export const GameTable: React.FC<any> = ({
                 phase={phase}
                 cardsCount={phase === 'distribution' ? cardsReceived[1] : undefined}
                 compact={phase === 'jeu' || phase === 'fin_pli'}
+                isCurrentWinner={currentWinnerId === 1}
+                contratId={contrat?.id}
               />
 
               <View style={styles.pliZone}>
@@ -135,6 +159,8 @@ export const GameTable: React.FC<any> = ({
                 phase={phase}
                 cardsCount={phase === 'distribution' ? cardsReceived[3] : undefined}
                 compact={phase === 'jeu' || phase === 'fin_pli'}
+                isCurrentWinner={currentWinnerId === 3}
+                contratId={contrat?.id}
               />
             </View>
           </>
@@ -148,12 +174,15 @@ export const GameTable: React.FC<any> = ({
               plis={getPlis(0)}
               eq={getEq(0)}
               ann={contrat?.joueurId === 0}
+              part={partenaireRévélé && contrat?.partenaireId === 0}
               hum
               obj={contrat?.plisObjectif}
               isDealer={joueurs[0].id === donneurId}
               phase={phase}
               cardsCount={phase === 'distribution' ? cardsReceived[0] : undefined}
               compact={phase === 'jeu' || phase === 'fin_pli'}
+              isCurrentWinner={currentWinnerId === 0}
+              contratId={contrat?.id}
             />
           )}
         <View style={styles.handContainer}>
@@ -235,19 +264,39 @@ const PlayedCard = ({ cp, winner }: { cp: CartePosee, winner?: number }) => {
   );
 };
 
-const Player = ({ j, active, plis, eq, ann, part, orient = 'horizontal', hum, obj, isDealer, phase, cardsCount, compact }: any) => {
+const Player = ({ j, active, plis, eq, ann, part, orient = 'horizontal', hum, obj, isDealer, phase, cardsCount, compact, isCurrentWinner, contratId }: any) => {
   const { t } = useTranslation();
   const color = eq === 'A' ? Colors.primary : '#E24B4A';
   const nbCartes = cardsCount !== undefined ? cardsCount : j.main.length;
+
+  // Libellés spécifiques au Whist Belge (Gand)
+  let roleLabel = "";
+  if (ann) {
+    if (contratId === 'propose') roleLabel = "Propose";
+    else if (contratId === 'demande') roleLabel = "Demande";
+    else if (contratId === 'trou' || contratId === 'trou_royal') roleLabel = "Trou";
+    else roleLabel = "Annonce";
+  } else if (part) {
+    if (contratId === 'propose') roleLabel = "Emballe";
+    else if (contratId === 'demande') roleLabel = "Réponse";
+    else if (contratId === 'trou' || contratId === 'trou_royal') roleLabel = "Boucle";
+    else roleLabel = "Parten.";
+  }
 
   return (
     <View style={[
       styles.pSlot,
       active && styles.pActive,
       eq && { borderColor: color, borderWidth: 2 },
-      compact && styles.pSlotCompact
+      compact && styles.pSlotCompact,
+      isCurrentWinner && { backgroundColor: '#FFF9C4', borderColor: '#FBC02D', borderWidth: 2.5 }
     ]}>
       {isDealer && <View style={styles.dealerBadge}><Text style={styles.dealerText}>D</Text></View>}
+      {isCurrentWinner && !compact && (
+        <View style={styles.winnerBadge}>
+          <Text style={styles.winnerText}>🏆 Gagne le pli</Text>
+        </View>
+      )}
       {!hum && nbCartes > 0 && (
         <View style={compact ? { transform: [{ scale: 0.7 }] } : null}>
           <HandBack nbCartes={nbCartes} orientation={orient} />
@@ -258,7 +307,13 @@ const Player = ({ j, active, plis, eq, ann, part, orient = 'horizontal', hum, ob
           <Text style={[styles.pName, active && { color: Colors.primary }, compact && { fontSize: 10 }]}>
             {j.nom}{hum ? ' (Vous)' : ''}
           </Text>
-          {(ann || part) && <Text style={{ fontSize: compact ? 10 : 12 }}>{ann ? '🎯' : '🤝'}</Text>}
+          {(ann || part) && (
+            <View style={styles.roleBadge}>
+               <Text style={{ fontSize: compact ? 8 : 10, color: '#fff', fontWeight: 'bold' }}>
+                 {ann ? '🎯' : '🤝'} {roleLabel}
+               </Text>
+            </View>
+          )}
         </View>
         {!compact && (
           <Text style={[styles.pScore, hum && styles.pScoreHum]}>
@@ -367,6 +422,30 @@ const styles = StyleSheet.create({
   dealerText: {
     color: '#fff',
     fontSize: 12,
+    fontWeight: FontWeight.bold,
+  },
+  winnerBadge: {
+    position: 'absolute',
+    top: -18,
+    backgroundColor: '#FBC02D',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 10,
+    zIndex: 30,
+    elevation: 5,
+  },
+  winnerText: {
+    color: '#000',
+    fontSize: 9,
     fontWeight: 'bold',
+    textTransform: 'uppercase',
+  },
+  roleBadge: {
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    paddingHorizontal: 4,
+    paddingVertical: 1,
+    borderRadius: 4,
+    flexDirection: 'row',
+    alignItems: 'center',
   },
 });

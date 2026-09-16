@@ -44,7 +44,13 @@ jobs:
         run: |
           mkdir -p android/app
           echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > android/app/keystore.jks
-
+      - name: Show fingerprint
+        run: |
+          keytool -list -v \
+            -keystore android/app/keystore.jks \
+            -alias "${{ secrets.KEY_ALIAS }}" \
+            -storepass "${{ secrets.KEYSTORE_PASSWORD }}" \
+            | grep SHA256
       - name: Validate production keystore
         run: |
           FINGERPRINT=$(keytool -list -v \
