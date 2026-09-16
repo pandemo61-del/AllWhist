@@ -338,7 +338,15 @@ jobs:
 
           END=$(date +%s)
           echo "- keystore decode: $((END - START)) seconds" >> "$GITHUB_STEP_SUMMARY"
-
+          
+      - name: Show keystore fingerprint
+        run: |
+          keytool -list -v \
+            -keystore android/app/keystore.jks \
+            -alias "${{ secrets.KEY_ALIAS }}" \
+            -storepass "${{ secrets.KEYSTORE_PASSWORD }}" \
+            | grep -E "SHA1:|SHA256:"
+            
       - name: Make gradlew executable
         run: chmod +x gradlew
         working-directory: android
