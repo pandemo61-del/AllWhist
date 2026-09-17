@@ -92,6 +92,7 @@ export type PhaseJeu =
   | 'distribution'
   | 'encheres'
   | 'annonce_contrat'
+  | 'ecart'
   | 'jeu'
   | 'fin_pli'
   | 'fin_manche'

@@ -77,7 +77,10 @@ export const saveUserSettings = async (uid: string, settings: any) => {
   try {
     // 1. S'assurer que le document racine existe pour la liste admin
     const userRoot = doc(db, 'users', uid);
-    await setDoc(userRoot, { lastSeen: new Date().toISOString() }, { merge: true });
+    await setDoc(userRoot, {
+      lastSeen: new Date().toISOString(),
+      pseudo: settings.pseudo || 'Anonyme'
+    }, { merge: true });
 
     // 2. Sauvegarder les réglages
     const docRef = doc(db, 'users', uid, 'private', 'settings');
@@ -137,6 +140,7 @@ export const saveGame = async (uid: string, gameData: any) => {
     await setDoc(gameRef, cleanData({
       ...gameData,
       userId: uid,
+      userPseudo: gameData.donne?.[0]?.nom || 'Anonyme',
       createdAt: now.toISOString(),
     }));
     return docId;

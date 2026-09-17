@@ -19,7 +19,7 @@ import { DistributionAnimation } from './DistributionAnimation';
 const { width: SW } = Dimensions.get('window');
 
 export const GameTable: React.FC<any> = ({
-  phase, varianteId, joueurs, pliEnCours, atout, contrat, tourDeJoueur, plisTermines, partenaireRévélé, children, centerContent, isBidding = false,
+  phase, varianteId, joueurs, pliEnCours, atout, contrat, tourDeJoueur, plisTermines, partenaireRévélé, children, centerContent, isBidding = false, isDiscarding = false,
 }) => {
   const [cardsReceived, setCardsReceived] = React.useState<number[]>([0, 0, 0, 0]);
 
@@ -88,11 +88,17 @@ export const GameTable: React.FC<any> = ({
       )}
 
       <View style={styles.arena}>
-        {isBidding ? (
-          /* Enchères : On cache les adversaires pour donner tout l'espace au centre */
-          <View style={{ flex: 1, justifyContent: 'center' }}>
+        {isBidding || isDiscarding ? (
+          /* Enchères ou Écart : On cache les adversaires pour donner tout l'espace au centre */
+          <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
             <View style={styles.biddingContainer}>
               {centerContent}
+              {isDiscarding && (
+                <View style={styles.discardPrompt}>
+                  <Text style={styles.discardTitle}>Petite Misère</Text>
+                  <Text style={styles.discardText}>Touchez une carte dans votre main pour l'écarter définitivement de cette manche.</Text>
+                </View>
+              )}
             </View>
           </View>
         ) : (
@@ -185,7 +191,7 @@ export const GameTable: React.FC<any> = ({
               contratId={contrat?.id}
             />
           )}
-        <View style={styles.handContainer}>
+          <View style={styles.handContainer}>
             {phase === 'distribution'
               ? (React.isValidElement(children) ? React.cloneElement(children as any, { maxVisible: cardsReceived[0] }) : null)
               : children
@@ -205,19 +211,17 @@ export const GameTable: React.FC<any> = ({
 const PlayedCard = ({ cp, winner }: { cp: CartePosee, winner?: number }) => {
   // Cibles ajustées pour un centrage compact et harmonieux
   const target = [
-    { x: 0, y: normalize(55) },    // Vous (Sud)
-    { x: -normalize(70), y: 0 },   // Marc (Ouest)
-    { x: 0, y: -normalize(55) },   // Julie (Nord)
-    { x: normalize(70), y: 0 }     // Paul (Est)
+    { x: normalize(20), y: normalize(55) },    // Vous (Sud)
+    { x: -normalize(50), y: 0 },               // Marc (Ouest)
+    { x: normalize(20), y: -normalize(55) },   // Julie (Nord)
+    { x: normalize(90), y: 0 }                 // Paul (Est)
   ][cp.joueurId];
 
-  // Rotation légère pour un effet plus naturel
-  const rotate = [
-    '2deg',
-    '-3deg',
-    '1deg',
-    '-2deg'
-  ][cp.joueurId];
+  // Rotation aléatoire pour un effet "dépose manuelle"
+  const randomRotate = React.useMemo(() => {
+    const deg = (Math.random() * 8) - 4; // Entre -4 et 4 degrés
+    return `${deg}deg`;
+  }, []);
 
   const start = [
     { x: 0, y: normalize(200) },
@@ -240,7 +244,7 @@ const PlayedCard = ({ cp, winner }: { cp: CartePosee, winner?: number }) => {
       Animated.sequence([
         Animated.delay(1200),
         Animated.parallel([
-          Animated.timing(anim, { toValue: [{ x: 0, y: 55 }, { x: -65, y: 0 }, { x: 0, y: -55 }, { x: 65, y: 0 }][winner], duration: 400, useNativeDriver: true }),
+          Animated.timing(anim, { toValue: [{ x: 20, y: 55 }, { x: -45, y: 0 }, { x: 20, y: -55 }, { x: 85, y: 0 }][winner], duration: 400, useNativeDriver: true }),
           Animated.timing(fade, { toValue: 0, duration: 400, useNativeDriver: true }),
         ])
       ]).start();
@@ -255,7 +259,7 @@ const PlayedCard = ({ cp, winner }: { cp: CartePosee, winner?: number }) => {
         transform: [
           { translateX: anim.x },
           { translateY: anim.y },
-          { rotate: rotate }
+          { rotate: randomRotate }
         ]
       }
     ]}>
@@ -398,7 +402,7 @@ const styles = StyleSheet.create({
   },
   pCard: {
     position: 'absolute',
-    marginLeft: -normalize(45),
+    marginLeft: -normalize(25), // Décale les cartes vers la droite pour centrer le pli
     marginTop: -normalize(64),
     ...Shadows.card,
     zIndex: 2000,
@@ -447,5 +451,27 @@ const styles = StyleSheet.create({
     borderRadius: 4,
     flexDirection: 'row',
     alignItems: 'center',
+  },
+  discardPrompt: {
+    backgroundColor: '#fff',
+    padding: 20,
+    borderRadius: 15,
+    borderWidth: 2,
+    borderColor: '#E24B4A',
+    alignItems: 'center',
+    marginHorizontal: 40,
+    ...Shadows.panel,
+  },
+  discardTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#E24B4A',
+    marginBottom: 8,
+  },
+  discardText: {
+    fontSize: 14,
+    color: '#455a64',
+    textAlign: 'center',
+    lineHeight: 20,
   },
 });

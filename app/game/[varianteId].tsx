@@ -101,7 +101,7 @@ export default function GameScreen() {
     contratEnCours, etatEnchere, scores, manche,
     tourDeJoueur, partenaireRévélé, historiqueManches,
     estScenario, notification,
-    jouerCarte, placerEnchere, passerEnchere, avancerPli, avancerManche, terminerPartie, cartesJouablesHumain
+    jouerCarte, ecarterCarte, placerEnchere, passerEnchere, avancerPli, avancerManche, terminerPartie, cartesJouablesHumain
   } = useGameStore();
 
   useEffect(() => {
@@ -147,8 +147,12 @@ export default function GameScreen() {
   };
 
   const handleJouerCarte = useCallback((carte: Carte) => {
-    jouerCarte(carte);
-  }, [jouerCarte]);
+    if (phase === 'ecart') {
+      ecarterCarte(carte);
+    } else {
+      jouerCarte(carte);
+    }
+  }, [jouerCarte, ecarterCarte, phase]);
 
   const handleEnchere = useCallback((id: string, atout?: Couleur, as?: Carte) => {
     placerEnchere(id, atout, as);
@@ -225,7 +229,7 @@ export default function GameScreen() {
       <View style={styles.corps}>
 
         {/* Phase : Enchères, Distribution ou Jeu */}
-        {(phase === 'distribution' || phase === 'encheres' || phase === 'jeu' || phase === 'fin_pli' || phase === 'annonce_contrat') && (
+        {(phase === 'distribution' || phase === 'encheres' || phase === 'jeu' || phase === 'fin_pli' || phase === 'annonce_contrat' || phase === 'ecart') && (
           <View style={styles.jeuZone}>
 
             {/* Table (Visible pour toutes les phases actives) */}
@@ -241,6 +245,7 @@ export default function GameScreen() {
               partenaireRévélé={partenaireRévélé}
               scores={scores}
               isBidding={phase === 'encheres'}
+              isDiscarding={phase === 'ecart'}
               centerContent={
                 (phase === 'encheres' && !notification) ? (
                   <BidPanel
@@ -262,6 +267,7 @@ export default function GameScreen() {
                 onJouerCarte={handleJouerCarte}
                 phase={
                   phase === 'encheres' ? 'encheres' :
+                  phase === 'ecart' ? 'ecart' :
                   (tourDeJoueur === 0 && phase === 'jeu' ? 'jeu' : 'attente')
                 }
                 cartesVisibles={contratEnCours?.cartesVisibles}

@@ -140,6 +140,7 @@ export function compterPlisParJoueur(
 
 // ─── Vérification fin de manche ────────────────
 
-export function mancheTerminee(plisTermines: Pli[], totalPlis = 13): boolean {
-  return plisTermines.length >= totalPlis;
+export function mancheTerminee(plisTermines: Pli[], contrat?: ContratJoue): boolean {
+  const totalAttendu = (contrat?.id === 'petite_misere') ? 12 : 13;
+  return plisTermines.length >= totalAttendu;
 }

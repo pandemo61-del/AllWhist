@@ -47,6 +47,15 @@ describe('Simulation intensive - 200 parties de Whist de Gand', () => {
         } else {
           passesConsecutifs = 0;
           const config = getContrat(WhistGand, decision.contratId!);
+
+          // Gérer l'écart pour la petite misère au sein de la simulation intensive
+          if (decision.contratId === 'petite_misere') {
+            joueurs.forEach(j => {
+              j.main.sort((a,b) => b.valeur - a.valeur);
+              j.main.shift(); // Écarte la carte la plus forte de chaque joueur
+            });
+          }
+
           meilleureEnchere = {
             id: decision.contratId!,
             nom: config.nom,
@@ -82,6 +91,9 @@ describe('Simulation intensive - 200 parties de Whist de Gand', () => {
       const mainInitialeSoliste = formatMain(mainsInitiales[meilleureEnchere.joueurId]);
 
       for (let pIdx = 0; pIdx < 13; pIdx++) {
+        if (joueurs[0].main.length === 0 || joueurs[1].main.length === 0 || joueurs[2].main.length === 0 || joueurs[3].main.length === 0) {
+          break; // Fin de la manche si un joueur n'a plus de carte (par exemple, suite à l'écart d'une petite misère)
+        }
         let pli: Pli = { numero: pIdx + 1, cartesJouees: [] };
 
         for (let jCount = 0; jCount < 4; jCount++) {

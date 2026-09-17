@@ -37,6 +37,7 @@ export const Hand: React.FC<any> = ({ cartes, cartesJouables, onJouerCarte, phas
 
   let label = t('hand.waiting');
   if (phase === 'jeu') label = t('hand.yourTurn');
+  else if (phase === 'ecart') label = "Choisissez une carte à écarter";
   else if (phase === 'encheres') label = t('hand.biddingHand');
 
   return (
@@ -48,7 +49,7 @@ export const Hand: React.FC<any> = ({ cartes, cartesJouables, onJouerCarte, phas
       <View style={[styles.fan, { height: cardHeight + normalize(20) }]}>
         {visibleCards.map((c: any, i: number) => {
           const isSel = sel === c.id;
-          const jouable = jIds.has(c.id) || phase === 'encheres';
+          const jouable = jIds.has(c.id) || phase === 'encheres' || phase === 'ecart';
           const tx = startX + offsets[i];
           const mid = (cartes.length - 1) / 2;
           const ty = Math.abs(i - mid) * 2;

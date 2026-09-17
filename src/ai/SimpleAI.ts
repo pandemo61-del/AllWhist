@@ -59,8 +59,8 @@ function choisirCarteMoyen(
   contrat: ContratJoue | null,
   joueurId: number,
 ): Carte {
-  const estSolisteMisere = contrat?.id.startsWith('misere') && contrat.joueurId === joueurId;
-  const estContreMisere = contrat?.id.startsWith('misere') && contrat.joueurId !== joueurId;
+  const estSolisteMisere = contrat?.id.includes('misere') && contrat.joueurId === joueurId;
+  const estContreMisere = contrat?.id.includes('misere') && contrat.joueurId !== joueurId;
 
   // Misère : le soliste évite de prendre, les autres forcent à prendre
   if (estSolisteMisere) {
@@ -110,8 +110,8 @@ function choisirCarteExpert(
   mainComplete: Carte[],
   joueurId: number,
 ): Carte {
-  const estSolisteMisere = contrat?.id.startsWith('misere') && contrat.joueurId === joueurId;
-  const estContreMisere = contrat?.id.startsWith('misere') && contrat.joueurId !== joueurId;
+  const estSolisteMisere = contrat?.id.includes('misere') && contrat.joueurId === joueurId;
+  const estContreMisere = contrat?.id.includes('misere') && contrat.joueurId !== joueurId;
 
   if (estSolisteMisere) {
     return strategieMisere(jouables, pli, atout, cartesDejaJouees);
@@ -364,8 +364,8 @@ export function choisirEnchere(
 
   const seuils = {
     facile:  { propose: 18, solo: 28, abondance: 38, misere: 2 },
-    moyen:   { propose: 16, solo: 25, abondance: 34, misere: 4 },
-    expert:  { propose: 14, solo: 22, abondance: 30, misere: 6 },
+    moyen:   { propose: 16, solo: 26, abondance: 35, misere: 4 },
+    expert:  { propose: 15, solo: 22, abondance: 30, misere: 6 },
   }[niveau];
 
   const contratsDisponibles = variante.contrats.filter(c =>
@@ -385,18 +385,35 @@ export function choisirEnchere(
       const memeCouleur = main.filter(c => c.couleur === gc.couleur);
       return gc.valeur >= 11 && memeCouleur.length <= 3; // Un Valet mal protégé est fatal
   });
-  const peutMisere = force <= seuils.misere && !estDangereuxMisere && main.filter(c=>c.valeur >= 13).length === 0;
+
+  // Indicateur de risque précis pour l'IA en production (aligné sur les résultats des tests d'échec)
+  const forceMisereProd = main.reduce((acc, c) => {
+    if (c.valeur >= 11) return acc + 10; // Valets, Dames, Rois, As
+    if (c.valeur >= 8) return acc + 2;   // 8, 9, 10
+    return acc;
+  }, 0);
+
+  const peutMisere = forceMisereProd <= 25 && !estDangereuxMisere && main.filter(c => c.valeur === 14).length === 0;
 
   let contratChoisi: ContratConfig | null = null;
 
   if (force >= seuils.abondance && nbAtouts >= 7 && aHonneurAtout) {
-    contratChoisi = contratsDisponibles.find(c => c.id === 'abondance' || c.id === 'abondance_declaree') ?? null;
+    // Chercher le meilleur contrat d'Abondance possible selon les points
+    if (force >= 45) contratChoisi = contratsDisponibles.find(c => c.id === 'chelem') ?? null;
+    if (!contratChoisi && force >= 40) contratChoisi = contratsDisponibles.find(c => c.id === 'abondance_11') ?? null;
+    if (!contratChoisi && force >= 35) contratChoisi = contratsDisponibles.find(c => c.id === 'abondance_10') ?? null;
+    if (!contratChoisi && force >= 30 && nbAtouts >= 6) contratChoisi = contratsDisponibles.find(c => c.id === 'abondance_9') ?? null;
   }
   else if (force >= seuils.solo && nbAtouts >= 5 && aHonneurAtout) {
-    contratChoisi = contratsDisponibles.find(c => c.id === 'solo') ?? null;
+    if (force >= 28 && nbAtouts >= 6) contratChoisi = contratsDisponibles.find(c => c.id === 'solo_8') ?? null;
+    if (!contratChoisi && force >= 25) contratChoisi = contratsDisponibles.find(c => c.id === 'solo_7') ?? null;
+    if (!contratChoisi) contratChoisi = contratsDisponibles.find(c => c.id === 'solo_6') ?? null;
   }
   else if (peutMisere) {
-    contratChoisi = contratsDisponibles.find(c => c.id === 'misere' || c.id === 'misere_ouverte') ?? null;
+    // Hiérarchie des misères calée sur les indicateurs de risque fiabilisés sans pénalité pour les chicanes
+    if (forceMisereProd === 0) contratChoisi = contratsDisponibles.find(c => c.id === 'misere_ouverte') ?? null;
+    if (!contratChoisi && forceMisereProd <= 10) contratChoisi = contratsDisponibles.find(c => c.id === 'misere') ?? null;
+    if (!contratChoisi && forceMisereProd <= 20) contratChoisi = contratsDisponibles.find(c => c.id === 'petite_misere') ?? null;
   }
   else if (meilleureEnchere?.id === 'propose') {
     const colProposee = meilleureEnchere.atout!;

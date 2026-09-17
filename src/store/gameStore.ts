@@ -68,6 +68,9 @@ interface GameStore extends EtatPartie {
   /** Trie la main du joueur humain selon les préférences actuelles. */
   appliquerTriParametres: () => void;
 
+  /** Le joueur humain écarte une carte (Petite Misère). */
+  ecarterCarte: (carte: Carte) => void;
+
   /** Termine la phase de distribution et lance les enchères ou le jeu. */
   finaliserDistribution: () => void;
 
@@ -340,7 +343,7 @@ export const useGameStore = create<GameStore>()(
       const settings = useSettingsStore.getState();
       const MAX_MANCHES = settings.nbManchesParPartie;
 
-      if (mancheTerminee(nouveauxPlis) || miserePerdue) {
+      if (mancheTerminee(nouveauxPlis, state.contratEnCours!)) {
         // Analyser toutes les erreurs de la manche
         const toutesErreurs = nouveauxPlis.flatMap(p => analyserPli(p, state.contratEnCours!, state.atout, nouveauxPlis));
 
@@ -494,6 +497,36 @@ export const useGameStore = create<GameStore>()(
     });
     if ((state.donneur + 1) % 4 !== 0 || settings.autoJeu) {
       get()._faireProchaineActionIA();
+    }
+  },
+
+  ecarterCarte(carte) {
+    const state = get();
+    if (state.phase !== 'ecart') return;
+
+    const nouveauxJoueurs = state.joueurs.map(j => {
+      if (j.id === 0) {
+        return { ...j, main: j.main.filter(c => c.id !== carte.id) };
+      }
+      return j;
+    });
+
+    set({ joueurs: nouveauxJoueurs });
+
+    // Si tout le monde a fini d'écarter (main de 12 cartes pour tous)
+    const fini = nouveauxJoueurs.every(j => j.main.length <= 12);
+    if (fini) {
+      setTimeout(() => {
+        set({
+          phase: 'jeu',
+          tourDeJoueur: (state.donneur + 1) % 4,
+          pliEnCours: { numero: 0, cartesJouees: [] },
+        });
+        const currentSettings = useSettingsStore.getState();
+        if ((state.donneur + 1) % 4 !== 0 || currentSettings.autoJeu) {
+          get()._faireProchaineActionIA();
+        }
+      }, 800);
     }
   },
 
@@ -691,16 +724,24 @@ export const useGameStore = create<GameStore>()(
         atout: contratFinal.atout ?? null,
       });
 
-      // Après un délai, on commence le jeu
+      // Après un délai, on commence le jeu ou l'écart
       setTimeout(() => {
         const currentSettings = useSettingsStore.getState();
-        set({
-          phase: 'jeu',
-          tourDeJoueur: (state.donneur + 1) % 4,
-          pliEnCours: { numero: 0, cartesJouees: [] },
-        });
-        if ((state.donneur + 1) % 4 !== 0 || currentSettings.autoJeu) {
-          get()._faireProchaineActionIA();
+        const estPetiteMisere = contratFinal.id === 'petite_misere';
+
+        if (estPetiteMisere) {
+          set({ phase: 'ecart' });
+          // IA écartent immédiatement
+          get()._iaEcart();
+        } else {
+          set({
+            phase: 'jeu',
+            tourDeJoueur: (state.donneur + 1) % 4,
+            pliEnCours: { numero: 0, cartesJouees: [] },
+          });
+          if ((state.donneur + 1) % 4 !== 0 || currentSettings.autoJeu) {
+            get()._faireProchaineActionIA();
+          }
         }
       }, 3000);
       return;
@@ -759,6 +800,19 @@ export const useGameStore = create<GameStore>()(
     );
 
     get()._poserCarte(carte, state.tourDeJoueur);
+  },
+
+  _iaEcart() {
+    const state = get();
+    const nouveauxJoueurs = state.joueurs.map(j => {
+      if (j.type === 'humain') return j;
+      // L'IA écarte sa carte la plus "dangereuse" ou la plus forte
+      // En Petite Misère, elle veut écarter une grosse carte isolée
+      const mainTriee = [...j.main].sort((a, b) => b.valeur - a.valeur);
+      return { ...j, main: j.main.filter(c => c.id !== mainTriee[0].id) };
+    });
+
+    set({ joueurs: nouveauxJoueurs });
   },
 }), {
   name: 'allwhist-game-state',
