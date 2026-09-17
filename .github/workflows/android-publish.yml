@@ -56,19 +56,32 @@ jobs:
 
       - name: Generate Android project
         run: npx expo prebuild --platform android --clean
-
-      - name: Decode google-services.json
-        shell: bash
+      
+      - name: Force release signing config
         run: |
-          set -euo pipefail
+          sed -i \
+            '/release {/,/}/s/signingConfig signingConfigs.debug/signingConfig signingConfigs.release/' \
+            android/app/build.gradle
+            - name: Decode google-services.json
+              shell: bash
+              run: |
+                set -euo pipefail
+      
+                mkdir -p android/app
+      
+                printf '%s' '${{ secrets.GOOGLE_SERVICES_JSON }}' \
+                  > android/app/google-services.json
+      
+                if [ ! -s android/app/google-services.json ]; then
+                  echo "::error::google-services.json is empty."
+                  exit 1
+                fi
 
-          mkdir -p android/app
-
-          printf '%s' '${{ secrets.GOOGLE_SERVICES_JSON }}' \
-            > android/app/google-services.json
-
-          if [ ! -s android/app/google-services.json ]; then
-            echo "::error::google-services.json is empty."
+      - name: Fail if release still uses debug key
+        run: |
+          if grep -A20 "release {" android/app/build.gradle \
+             | grep -q "signingConfigs.debug"; then
+            echo "::error::Release build still uses debug signing"
             exit 1
           fi
 
