@@ -2,6 +2,23 @@ name: Android Production Build
 
 on:
   workflow_dispatch:
+    inputs:
+      track:
+        description: "Google Play track"
+        required: true
+        default: internal
+        type: choice
+        options:
+          - internal
+          - alpha
+          - beta
+          - production
+
+      publish:
+        description: "Publier sur Google Play"
+        required: true
+        default: true
+        type: boolean
 
 permissions:
   contents: read
@@ -309,12 +326,18 @@ jobs:
           path: android/app/build/outputs/bundle/release/app-release.aab
           if-no-files-found: error
           retention-days: 14
+          
+      - name: Display deployment settings
+        run: |
+          echo "Track    : ${{ inputs.track }}"
+          echo "Publish  : ${{ inputs.publish }}"
 
-      - name: Publish Internal Testing
+      - name: Publish Google Play
+        if: ${{ inputs.publish }}
         uses: r0adkll/upload-google-play@v1
         with:
           serviceAccountJsonPlainText: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON }}
           packageName: com.allwhist.app
           releaseFiles: android/app/build/outputs/bundle/release/app-release.aab
-          tracks: internal
+          tracks: ${{ inputs.track }}
           status: completed
