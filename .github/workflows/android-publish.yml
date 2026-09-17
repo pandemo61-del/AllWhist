@@ -63,10 +63,14 @@ jobs:
           set -euo pipefail
 
           mkdir -p android/app
+
           printf '%s' '${{ secrets.GOOGLE_SERVICES_JSON }}' \
             > android/app/google-services.json
 
-          test -s android/app/google-services.json
+          if [ ! -s android/app/google-services.json ]; then
+            echo "::error::google-services.json is empty."
+            exit 1
+          fi
 
       - name: Decode production keystore
         shell: bash
@@ -79,7 +83,10 @@ jobs:
             | base64 --decode \
             > "${KEYSTORE_PATH}"
 
-          test -s "${KEYSTORE_PATH}"
+          if [ ! -s "${KEYSTORE_PATH}" ]; then
+            echo "::error::Production keystore is empty."
+            exit 1
+          fi
 
       - name: Validate production keystore
         shell: bash
@@ -143,10 +150,14 @@ jobs:
 
           release_signing_config = r'''
                   release {
-                      def releaseStoreFile = System.getenv("MYAPP_RELEASE_STORE_FILE")
-                      def releaseKeyAlias = System.getenv("MYAPP_RELEASE_KEY_ALIAS")
-                      def releaseStorePassword = System.getenv("MYAPP_RELEASE_STORE_PASSWORD")
-                      def releaseKeyPassword = System.getenv("MYAPP_RELEASE_KEY_PASSWORD")
+                      def releaseStoreFile =
+                          System.getenv("MYAPP_RELEASE_STORE_FILE")
+                      def releaseKeyAlias =
+                          System.getenv("MYAPP_RELEASE_KEY_ALIAS")
+                      def releaseStorePassword =
+                          System.getenv("MYAPP_RELEASE_STORE_PASSWORD")
+                      def releaseKeyPassword =
+                          System.getenv("MYAPP_RELEASE_KEY_PASSWORD")
 
                       if (!releaseStoreFile ||
                           !releaseKeyAlias ||
@@ -170,11 +181,12 @@ jobs:
           )
 
           if not signing_configs_pattern.search(content):
-              print("ERROR: signingConfigs block not found in build.gradle.")
+              print("ERROR: signingConfigs block not found.")
               sys.exit(1)
 
           content = signing_configs_pattern.sub(
-              lambda match: match.group(1) + release_signing_config,
+              lambda match:
+                  match.group(1) + release_signing_config,
               content,
               count=1
           )
@@ -195,14 +207,17 @@ jobs:
 
           if replacements != 1:
               print(
-                  "ERROR: Could not replace the debug signingConfig "
+                  "ERROR: Could not replace signingConfigs.debug "
                   "inside the release build type."
               )
               sys.exit(1)
 
           gradle_file.write_text(content, encoding="utf-8")
 
-          print("Production signing configuration injected successfully.")
+          print(
+              "Production signing configuration "
+              "injected successfully."
+          )
           PY
 
       - name: Validate generated Gradle signing configuration
@@ -210,9 +225,10 @@ jobs:
         run: |
           set -euo pipefail
 
-          if ! grep -q "signingConfig signingConfigs.release" \
+          if ! grep -q \
+            "signingConfig signingConfigs.release" \
             android/app/build.gradle; then
-            echo "::error::Release build is not configured with signingConfigs.release."
+            echo "::error::Release build does not use signingConfigs.release."
             exit 1
           fi
 
@@ -232,21 +248,46 @@ jobs:
           )
 
           if not release_match:
-              print("ERROR: No signing configuration found for release.")
+              print(
+                  "ERROR: No signing configuration "
+                  "found for release."
+              )
               sys.exit(1)
 
           signing_config = release_match.group(1)
 
-          print(f"Release signing configuration: {signing_config}")
+          print(
+              f"Release signing configuration: "
+              f"{signing_config}"
+          )
 
           if signing_config != "release":
-              print("ERROR: Release build still uses a non-production key.")
+              print(
+                  "ERROR: Release build uses "
+                  "a non-production signing configuration."
+              )
               sys.exit(1)
           PY
 
+      - name: Display deployment settings
+        shell: bash
+        run: |
+          echo "Google Play track : ${{ inputs.track }}"
+          echo "Publish enabled   : ${{ inputs.publish }}"
+          echo "Build type        : release"
+          echo "Signing profile   : production"
+
       - name: Clean Android
         working-directory: android
-        run: ./gradlew clean --no-daemon
+        env:
+          MYAPP_RELEASE_STORE_FILE: keystore.jks
+          MYAPP_RELEASE_KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          MYAPP_RELEASE_STORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          MYAPP_RELEASE_KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: |
+          ./gradlew clean \
+            --no-daemon \
+            --stacktrace
 
       - name: Build production AAB
         working-directory: android
@@ -317,20 +358,15 @@ jobs:
             exit 1
           fi
 
-          echo "AAB is signed with the validated production certificate."
+          echo "AAB is signed with the production certificate."
 
       - name: Upload AAB artifact
         uses: actions/upload-artifact@v4
         with:
-          name: allwhist-production-aab
+          name: allwhist-${{ inputs.track }}-aab
           path: android/app/build/outputs/bundle/release/app-release.aab
           if-no-files-found: error
           retention-days: 14
-          
-      - name: Display deployment settings
-        run: |
-          echo "Track    : ${{ inputs.track }}"
-          echo "Publish  : ${{ inputs.publish }}"
 
       - name: Publish Google Play
         if: ${{ inputs.publish }}
