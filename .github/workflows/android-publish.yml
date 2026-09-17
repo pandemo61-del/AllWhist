@@ -308,10 +308,7 @@ jobs:
           echo "========== BUILD.GRADLE =========="
           cat android/app/build.gradle
           echo "=================================="
-      - name: STOP AFTER DUMP
-        run: |
-          echo "Workflow volontairement arrêté pour analyse"
-          exit 1    
+   
       - name: Build production AAB
         working-directory: android
         env:
