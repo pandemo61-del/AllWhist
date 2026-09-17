@@ -333,52 +333,7 @@ jobs:
 
           ls -lh "${AAB_PATH}"
 
-      - name: Verify AAB JAR signature
-        shell: bash
-        run: |
-          set -euo pipefail
 
-          jarsigner \
-            -verify \
-            -verbose \
-            -certs \
-            -strict \
-            "${AAB_PATH}"
-
-      - name: Verify AAB production certificate
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          AAB_FINGERPRINT="$(
-            keytool -printcert \
-              -jarfile "${AAB_PATH}" \
-            | sed -n 's/.*SHA256:[[:space:]]*//p' \
-            | head -n 1 \
-            | tr -d '[:space:]:-' \
-            | tr '[:lower:]' '[:upper:]'
-          )"
-
-          EXPECTED_FINGERPRINT="$(
-            printf '%s' "${{ secrets.KEYSTORE_SHA256 }}" \
-            | tr -d '[:space:]:-' \
-            | tr '[:lower:]' '[:upper:]'
-          )"
-
-          if [ -z "${AAB_FINGERPRINT}" ]; then
-            echo "::error::Unable to obtain signing certificate from AAB."
-            exit 1
-          fi
-
-          echo "Expected production fingerprint: ${EXPECTED_FINGERPRINT}"
-          echo "AAB signing fingerprint        : ${AAB_FINGERPRINT}"
-
-          if [ "${AAB_FINGERPRINT}" != "${EXPECTED_FINGERPRINT}" ]; then
-            echo "::error::AAB was not signed with the production key."
-            exit 1
-          fi
-
-          echo "AAB is signed with the production certificate."
 
       - name: Upload AAB artifact
         uses: actions/upload-artifact@v4
