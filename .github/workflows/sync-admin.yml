@@ -1,0 +1,28 @@
+name: Sync Admin to GitHub Pages
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'admin/**'
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout source repo
+        uses: actions/checkout@v4
+
+      - name: Push admin folder to pages repo
+        uses: cpina/github-action-push-to-another-repository@main
+        env:
+          API_TOKEN_GITHUB: ${{ secrets.PAGES_TOKEN }}
+
+        with:
+          source-directory: admin
+          destination-github-username: pandemo61-del
+          destination-repository-name: pandemo61-del.github.io
+          target-directory: allwhist/admin
+          target-branch: main
