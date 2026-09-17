@@ -3,12 +3,17 @@ name: Android Production Build
 on:
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
   build-and-publish:
     runs-on: ubuntu-latest
 
     env:
       APP_MODULE: app
+      AAB_PATH: android/app/build/outputs/bundle/release/app-release.aab
+      KEYSTORE_PATH: android/app/keystore.jks
 
     steps:
       - name: Checkout
@@ -36,60 +41,197 @@ jobs:
         run: npx expo prebuild --platform android --clean
 
       - name: Decode google-services.json
+        shell: bash
         run: |
-          mkdir -p android/app
-          echo '${{ secrets.GOOGLE_SERVICES_JSON }}' > android/app/google-services.json
+          set -euo pipefail
 
-      - name: Decode keystore
-        run: |
           mkdir -p android/app
-          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > android/app/keystore.jks
-      - name: Show fingerprint
+          printf '%s' '${{ secrets.GOOGLE_SERVICES_JSON }}' \
+            > android/app/google-services.json
+
+          test -s android/app/google-services.json
+
+      - name: Decode production keystore
+        shell: bash
         run: |
-          keytool -list -v \
-            -keystore android/app/keystore.jks \
-            -alias "${{ secrets.KEY_ALIAS }}" \
-            -storepass "${{ secrets.KEYSTORE_PASSWORD }}" \
-            | grep SHA256
+          set -euo pipefail
+
+          mkdir -p android/app
+
+          printf '%s' "${{ secrets.KEYSTORE_BASE64 }}" \
+            | base64 --decode \
+            > "${KEYSTORE_PATH}"
+
+          test -s "${KEYSTORE_PATH}"
+
       - name: Validate production keystore
+        shell: bash
         run: |
-          FINGERPRINT=$(keytool -list -v \
-          -keystore android/app/keystore.jks \
-          -alias "${{ secrets.KEY_ALIAS }}" \
-          -storepass "${{ secrets.KEYSTORE_PASSWORD }}" |
-          grep "SHA256:" |
-          head -1 |
-          sed 's/.*SHA256:[[:space:]]*//' |
-          tr -d '[:space:]')
-          
-          EXPECTED=$(echo "${{ secrets.KEYSTORE_SHA256 }}" | tr -d '[:space:]')
+          set -euo pipefail
 
-          echo "Expected fingerprint: $EXPECTED"
-          echo "Actual fingerprint  : $FINGERPRINT"
+          ACTUAL_FINGERPRINT="$(
+            keytool -list -v \
+              -keystore "${KEYSTORE_PATH}" \
+              -alias "${{ secrets.KEY_ALIAS }}" \
+              -storepass "${{ secrets.KEYSTORE_PASSWORD }}" \
+            | sed -n 's/.*SHA256:[[:space:]]*//p' \
+            | head -n 1 \
+            | tr -d '[:space:]:-' \
+            | tr '[:lower:]' '[:upper:]'
+          )"
 
-          if [ "$FINGERPRINT" != "$EXPECTED" ]; then
-            echo "ERROR: Wrong production keystore"
+          EXPECTED_FINGERPRINT="$(
+            printf '%s' "${{ secrets.KEYSTORE_SHA256 }}" \
+            | tr -d '[:space:]:-' \
+            | tr '[:lower:]' '[:upper:]'
+          )"
+
+          if [ -z "${ACTUAL_FINGERPRINT}" ]; then
+            echo "::error::Unable to read SHA-256 fingerprint from production keystore."
             exit 1
           fi
 
-      - name: Create signing properties
-        run: |
-          cat > android/keystore.properties <<EOF
-          MYAPP_RELEASE_STORE_FILE=keystore.jks
-          MYAPP_RELEASE_KEY_ALIAS=${{ secrets.KEY_ALIAS }}
-          MYAPP_RELEASE_STORE_PASSWORD=${{ secrets.KEYSTORE_PASSWORD }}
-          MYAPP_RELEASE_KEY_PASSWORD=${{ secrets.KEY_PASSWORD }}
-          EOF
+          if [ -z "${EXPECTED_FINGERPRINT}" ]; then
+            echo "::error::KEYSTORE_SHA256 is empty."
+            exit 1
+          fi
 
-      - name: Display signing configuration
+          echo "Expected production fingerprint: ${EXPECTED_FINGERPRINT}"
+          echo "Actual keystore fingerprint    : ${ACTUAL_FINGERPRINT}"
+
+          if [ "${ACTUAL_FINGERPRINT}" != "${EXPECTED_FINGERPRINT}" ]; then
+            echo "::error::Wrong production keystore or incorrect KEYSTORE_SHA256."
+            exit 1
+          fi
+
+          echo "Production keystore successfully validated."
+
+      - name: Inject production signing configuration
+        shell: bash
         run: |
-          sed -n '/signingConfigs/,/buildTypes/p' android/app/build.gradle || true
+          set -euo pipefail
+
+          python3 <<'PY'
+          from pathlib import Path
+          import re
+          import sys
+
+          gradle_file = Path("android/app/build.gradle")
+
+          if not gradle_file.exists():
+              print("ERROR: android/app/build.gradle was not generated.")
+              sys.exit(1)
+
+          content = gradle_file.read_text(encoding="utf-8")
+
+          release_signing_config = r'''
+                  release {
+                      def releaseStoreFile = System.getenv("MYAPP_RELEASE_STORE_FILE")
+                      def releaseKeyAlias = System.getenv("MYAPP_RELEASE_KEY_ALIAS")
+                      def releaseStorePassword = System.getenv("MYAPP_RELEASE_STORE_PASSWORD")
+                      def releaseKeyPassword = System.getenv("MYAPP_RELEASE_KEY_PASSWORD")
+
+                      if (!releaseStoreFile ||
+                          !releaseKeyAlias ||
+                          !releaseStorePassword ||
+                          !releaseKeyPassword) {
+                          throw new GradleException(
+                              "Production signing environment variables are missing."
+                          )
+                      }
+
+                      storeFile file(releaseStoreFile)
+                      storePassword releaseStorePassword
+                      keyAlias releaseKeyAlias
+                      keyPassword releaseKeyPassword
+                  }
+          '''
+
+          signing_configs_pattern = re.compile(
+              r"(signingConfigs\s*\{)",
+              re.MULTILINE
+          )
+
+          if not signing_configs_pattern.search(content):
+              print("ERROR: signingConfigs block not found in build.gradle.")
+              sys.exit(1)
+
+          content = signing_configs_pattern.sub(
+              lambda match: match.group(1) + release_signing_config,
+              content,
+              count=1
+          )
+
+          release_block_pattern = re.compile(
+              r"(release\s*\{[\s\S]*?)"
+              r"signingConfig\s+signingConfigs\.debug",
+              re.MULTILINE
+          )
+
+          content, replacements = release_block_pattern.subn(
+              lambda match:
+                  match.group(1) +
+                  "signingConfig signingConfigs.release",
+              content,
+              count=1
+          )
+
+          if replacements != 1:
+              print(
+                  "ERROR: Could not replace the debug signingConfig "
+                  "inside the release build type."
+              )
+              sys.exit(1)
+
+          gradle_file.write_text(content, encoding="utf-8")
+
+          print("Production signing configuration injected successfully.")
+          PY
+
+      - name: Validate generated Gradle signing configuration
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if ! grep -q "signingConfig signingConfigs.release" \
+            android/app/build.gradle; then
+            echo "::error::Release build is not configured with signingConfigs.release."
+            exit 1
+          fi
+
+          python3 <<'PY'
+          from pathlib import Path
+          import re
+          import sys
+
+          content = Path(
+              "android/app/build.gradle"
+          ).read_text(encoding="utf-8")
+
+          release_match = re.search(
+              r"release\s*\{[\s\S]*?"
+              r"signingConfig\s+signingConfigs\.(\w+)",
+              content
+          )
+
+          if not release_match:
+              print("ERROR: No signing configuration found for release.")
+              sys.exit(1)
+
+          signing_config = release_match.group(1)
+
+          print(f"Release signing configuration: {signing_config}")
+
+          if signing_config != "release":
+              print("ERROR: Release build still uses a non-production key.")
+              sys.exit(1)
+          PY
 
       - name: Clean Android
         working-directory: android
-        run: ./gradlew clean
+        run: ./gradlew clean --no-daemon
 
-      - name: Build Production AAB
+      - name: Build production AAB
         working-directory: android
         env:
           MYAPP_RELEASE_STORE_FILE: keystore.jks
@@ -97,34 +239,75 @@ jobs:
           MYAPP_RELEASE_STORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
           MYAPP_RELEASE_KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         run: |
-          ./gradlew bundleRelease \
+          ./gradlew :app:bundleRelease \
             --no-daemon \
             --stacktrace
 
       - name: Verify AAB generated
+        shell: bash
         run: |
-          test -f android/app/build/outputs/bundle/release/app-release.aab
+          set -euo pipefail
 
-      - name: Verify AAB signature
+          if [ ! -s "${AAB_PATH}" ]; then
+            echo "::error::Production AAB was not generated."
+            exit 1
+          fi
+
+          ls -lh "${AAB_PATH}"
+
+      - name: Verify AAB JAR signature
+        shell: bash
         run: |
-          jarsigner -verify \
+          set -euo pipefail
+
+          jarsigner \
+            -verify \
             -verbose \
             -certs \
-            android/app/build/outputs/bundle/release/app-release.aab
+            -strict \
+            "${AAB_PATH}"
 
-      - name: Display signing certificate
+      - name: Verify AAB production certificate
+        shell: bash
         run: |
-          keytool -list -v \
-            -keystore android/app/keystore.jks \
-            -alias "${{ secrets.KEY_ALIAS }}" \
-            -storepass "${{ secrets.KEYSTORE_PASSWORD }}" \
-            | grep -E "SHA1:|SHA256:"
+          set -euo pipefail
+
+          AAB_FINGERPRINT="$(
+            keytool -printcert \
+              -jarfile "${AAB_PATH}" \
+            | sed -n 's/.*SHA256:[[:space:]]*//p' \
+            | head -n 1 \
+            | tr -d '[:space:]:-' \
+            | tr '[:lower:]' '[:upper:]'
+          )"
+
+          EXPECTED_FINGERPRINT="$(
+            printf '%s' "${{ secrets.KEYSTORE_SHA256 }}" \
+            | tr -d '[:space:]:-' \
+            | tr '[:lower:]' '[:upper:]'
+          )"
+
+          if [ -z "${AAB_FINGERPRINT}" ]; then
+            echo "::error::Unable to obtain signing certificate from AAB."
+            exit 1
+          fi
+
+          echo "Expected production fingerprint: ${EXPECTED_FINGERPRINT}"
+          echo "AAB signing fingerprint        : ${AAB_FINGERPRINT}"
+
+          if [ "${AAB_FINGERPRINT}" != "${EXPECTED_FINGERPRINT}" ]; then
+            echo "::error::AAB was not signed with the production key."
+            exit 1
+          fi
+
+          echo "AAB is signed with the validated production certificate."
 
       - name: Upload AAB artifact
         uses: actions/upload-artifact@v4
         with:
           name: allwhist-production-aab
           path: android/app/build/outputs/bundle/release/app-release.aab
+          if-no-files-found: error
           retention-days: 14
 
       - name: Publish Internal Testing
@@ -133,5 +316,5 @@ jobs:
           serviceAccountJsonPlainText: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON }}
           packageName: com.allwhist.app
           releaseFiles: android/app/build/outputs/bundle/release/app-release.aab
-          track: internal
+          tracks: internal
           status: completed
