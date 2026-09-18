@@ -12,17 +12,13 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout source repo
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Push admin folder to pages repo
-        uses: cpina/github-action-push-to-another-repository@main
-        env:
-          API_TOKEN_GITHUB: ${{ secrets.PAGES_TOKEN }}
-
+      - name: Deploy admin folder
+        uses: JamesIves/github-pages-deploy-action@v4
         with:
-          source-directory: admin
-          destination-github-username: pandemo61-del
-          destination-repository-name: pandemo61-del.github.io
-          target-directory: allwhist/admin
-          target-branch: main
+          token: ${{ secrets.PAGES_TOKEN }}
+          repository-name: pandemo61-del/pandemo61-del.github.io
+          branch: main
+          folder: admin
+          target-folder: allwhist
