@@ -14,6 +14,15 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Display deployment information
+        run: |
+          echo "========================================="
+          echo "Source      : AllWhist/admin"
+          echo "Destination : pandemo61-del.github.io/allwhist"
+          echo "Commit      : ${{ github.sha }}"
+          echo "Actor       : ${{ github.actor }}"
+          echo "========================================="
+
       - name: Deploy admin as allwhist root
         uses: JamesIves/github-pages-deploy-action@v4
         with:
@@ -23,3 +32,10 @@ jobs:
           folder: admin
           target-folder: allwhist
           clean: true
+
+      - name: Deployment summary
+        run: |
+          echo "✅ Deployment completed"
+          echo "📂 Copied : AllWhist/admin"
+          echo "📂 To     : pandemo61-del.github.io/allwhist"
+          echo "🌐 Site   : https://pandemo61-del.github.io/allwhist/"
