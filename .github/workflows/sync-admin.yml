@@ -6,6 +6,7 @@ on:
       - main
     paths:
       - 'admin/**'
+  workflow_dispatch:
 
 jobs:
   sync:
@@ -31,7 +32,7 @@ jobs:
           branch: main
           folder: admin
           target-folder: allwhist
-          clean: true
+          clean: false
 
       - name: Deployment summary
         run: |
