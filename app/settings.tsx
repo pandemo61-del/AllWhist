@@ -1,8 +1,8 @@
-import React from 'react';
 import {
-  View, Text, StyleSheet, SafeAreaView,
+  View, Text, StyleSheet,
   TouchableOpacity, ScrollView, TextInput,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { useSettingsStore, DirectionTri, OrdreValeur, Langue } from '../src/store/settingsStore';
 import { useGameStore } from '../src/store/gameStore';

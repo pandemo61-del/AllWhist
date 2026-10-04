@@ -112,8 +112,8 @@ export function calculerScoreWhistBelge(
   // Calcul du montant de base par adversaire
   let montantParAdversaire = reussite ? contrat.pointsReussite : contrat.pointsEchec;
 
-  // Bonus Surplis (uniquement pour les contrats à l'atout hors Abondance/Trou)
-  if (reussite && (contrat.id === 'propose' || contrat.id === 'emballe' || contrat.id.startsWith('solo'))) {
+  // Bonus Surplis (pour tous les contrats à l'atout avec un objectif de plis > 0 hors Chelem)
+  if (reussite && !contrat.sanAtout && contrat.plisObjectif > 0 && contrat.id !== 'chelem') {
     const surplis = plisTotal - contrat.plisObjectif;
     if (surplis > 0) {
       montantParAdversaire += surplis; // +1 pt par surplis par adversaire

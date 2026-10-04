@@ -12,6 +12,7 @@ import { ContratConfig, VariantConfig } from '../variants/types';
 import { SYMBOLE, estRouge } from '../engine/deck';
 import { choisirEnchere } from '../ai/SimpleAI';
 import { useSettingsStore } from '../store/settingsStore';
+import { useGameStore } from '../store/gameStore';
 import { useTranslation } from '../i18n';
 import {
   Colors, Spacing, FontSize, FontWeight, Radius,
@@ -50,6 +51,18 @@ export const BidPanel: React.FC<BidPanelProps> = ({
 
   const { ordreCouleurs, coachCredits, useCoachCredit } = useSettingsStore();
   const { t } = useTranslation();
+  const estScenario = useGameStore(s => s.estScenario);
+  const scenarioActuel = useGameStore(s => s.scenarioActuel);
+
+  // Pré-sélection de l'annonce cible du scénario
+  React.useEffect(() => {
+    if (estScenario && scenarioActuel?.contratId && !contratSel) {
+      const target = variante.contrats.find(c => c.id === scenarioActuel.contratId);
+      if (target) {
+        setContratSel(target);
+      }
+    }
+  }, [estScenario, scenarioActuel, variante, contratSel]);
 
   // Recommendation IA pour l'apprentissage
   const recommendation = React.useMemo(() => {
@@ -71,8 +84,8 @@ export const BidPanel: React.FC<BidPanelProps> = ({
     const currentPriorite = meilleureEnchere?.priorite ?? -1;
 
     // Le Trou n'est obligatoire que si personne n'a dit mieux
-    if (nbAs === 3 && currentPriorite < 2) return 'trou';
-    if (nbAs === 4 && currentPriorite < 3) return 'trou_royal';
+    if (nbAs === 3 && currentPriorite < 7) return 'trou';
+    if (nbAs === 4 && currentPriorite < 7.5) return 'trou_royal';
     return null;
   }, [main, variante, meilleureEnchere]);
 
@@ -181,8 +194,8 @@ export const BidPanel: React.FC<BidPanelProps> = ({
       return [{ couleur: Couleur.COEUR, carte: { id: `13_${Couleur.COEUR}`, valeur: 13 as any, couleur: Couleur.COEUR }, label: 'Roi' }];
     }
 
-    // Sinon (Demande / Trou), on cherche les As manquants
-    return [Couleur.PIQUE, Couleur.COEUR, Couleur.CARREAU, Couleur.TREFLE].flatMap(col => {
+    // Sinon (Demande / Trou), on cherche les As manquants dans l'ordre Cœur, Carreau, Trèfle, Pique
+    return [Couleur.COEUR, Couleur.CARREAU, Couleur.TREFLE, Couleur.PIQUE].flatMap(col => {
       const asInMain = main.find(c => c.valeur === 14 && c.couleur === col);
       if (asInMain) return [];
       return [{ couleur: col, carte: { id: `14_${col}`, valeur: 14 as any, couleur: col }, label: 'As' }];
@@ -281,37 +294,64 @@ export const BidPanel: React.FC<BidPanelProps> = ({
         </View>
       )}
 
+      {/* Bannière Scénario */}
+      {estScenario && scenarioActuel && (
+        <View style={styles.scenarioBanner}>
+          <Text style={styles.scenarioBannerTitre}>🎯 Scénario : {scenarioActuel.titre}</Text>
+          <Text style={styles.scenarioBannerSub}>
+            Main configurée pour tester l'annonce « {
+              variante.contrats.find(c => c.id === scenarioActuel.contratId)?.nom || scenarioActuel.contratId || 'Cible'
+            } »
+          </Text>
+        </View>
+      )}
+
       <ScrollView showsVerticalScrollIndicator={false}>
 
         {/* ── Étape 1 : Choix du contrat ─────────── */}
         <Text style={styles.sectionLabel}>Choisir un contrat</Text>
-        {contratsDisponibles.map(contrat => (
-          <TouchableOpacity
-            key={contrat.id}
-            style={[styles.contratBtn, contratSel?.id === contrat.id && styles.contratBtnSel]}
-            onPress={() => handleSelContrat(contrat)}
-            activeOpacity={0.8}
-          >
-            <View style={styles.contratInfo}>
-              <Text style={styles.contratNom}>{contrat.nom}</Text>
-              <Text style={styles.contratDesc}>{contrat.description}</Text>
-              {(contrat.sanAtout || contrat.cartesVisibles) && (
-                <View style={styles.tagsRow}>
-                  {contrat.sanAtout && (
-                    <View style={styles.tag}><Text style={styles.tagTexte}>Sans atout</Text></View>
-                  )}
-                  {contrat.cartesVisibles && (
-                    <View style={styles.tag}><Text style={styles.tagTexte}>Cartes visibles</Text></View>
+        {contratsDisponibles.map(contrat => {
+          const estCibleScenario = estScenario && scenarioActuel?.contratId === contrat.id;
+
+          return (
+            <TouchableOpacity
+              key={contrat.id}
+              style={[
+                styles.contratBtn,
+                contratSel?.id === contrat.id && styles.contratBtnSel,
+                estCibleScenario && styles.contratBtnTargetScenario,
+              ]}
+              onPress={() => handleSelContrat(contrat)}
+              activeOpacity={0.8}
+            >
+              <View style={styles.contratInfo}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <Text style={styles.contratNom}>{contrat.nom}</Text>
+                  {estCibleScenario && (
+                    <View style={styles.badgeCibleScenario}>
+                      <Text style={styles.badgeCibleScenarioTexte}>⭐ Jouer l'annonce</Text>
+                    </View>
                   )}
                 </View>
-              )}
-            </View>
-            <View style={styles.pointsBadge}>
-              <Text style={styles.pointsVal}>+{contrat.pointsReussite}</Text>
-              <Text style={styles.pointsLabel}>pts</Text>
-            </View>
-          </TouchableOpacity>
-        ))}
+                <Text style={styles.contratDesc}>{contrat.description}</Text>
+                {(contrat.sanAtout || contrat.cartesVisibles) && (
+                  <View style={styles.tagsRow}>
+                    {contrat.sanAtout && (
+                      <View style={styles.tag}><Text style={styles.tagTexte}>Sans atout</Text></View>
+                    )}
+                    {contrat.cartesVisibles && (
+                      <View style={styles.tag}><Text style={styles.tagTexte}>Cartes visibles</Text></View>
+                    )}
+                  </View>
+                )}
+              </View>
+              <View style={styles.pointsBadge}>
+                <Text style={styles.pointsVal}>+{contrat.pointsReussite}</Text>
+                <Text style={styles.pointsLabel}>pts</Text>
+              </View>
+            </TouchableOpacity>
+          );
+        })}
 
         {/* ── Étape 2 : Choix de l'atout ─────────── */}
         {contratSel && !contratSel.sanAtout && variante.atoutChoisi && (
@@ -514,6 +554,42 @@ const styles = StyleSheet.create({
     borderRadius: Radius.lg,
     paddingVertical: 0,
     marginBottom: 0,
+  },
+
+  scenarioBanner: {
+    backgroundColor: Colors.primaryDark + '33',
+    borderColor: Colors.primary,
+    borderWidth: 1,
+    borderRadius: Radius.md,
+    padding: Spacing.sm,
+    paddingHorizontal: Spacing.md,
+    marginBottom: Spacing.md,
+  },
+  scenarioBannerTitre: {
+    fontSize: FontSize.xs,
+    fontWeight: FontWeight.bold,
+    color: Colors.primaryLight,
+  },
+  scenarioBannerSub: {
+    fontSize: 11,
+    color: Colors.textSecondary,
+    marginTop: 2,
+  },
+  contratBtnTargetScenario: {
+    borderColor: Colors.primary,
+    borderWidth: 1.5,
+    backgroundColor: Colors.primaryDark + '15',
+  },
+  badgeCibleScenario: {
+    backgroundColor: Colors.primaryDark,
+    borderRadius: Radius.sm,
+    paddingHorizontal: 6,
+    paddingVertical: 1,
+  },
+  badgeCibleScenarioTexte: {
+    fontSize: 10,
+    fontWeight: FontWeight.bold,
+    color: Colors.primaryLight,
   },
 
   recommendationBox: {

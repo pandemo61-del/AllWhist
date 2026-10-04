@@ -55,6 +55,19 @@ export const WhistGand: VariantConfig = {
       },
     },
     {
+      id: 'demande',
+      nom: "Demande à l'As",
+      description: "Appeler un As secret pour faire 8 plis à deux.",
+      plisMin: 8, plisMax: 13,
+      seul: false, partenaire: true,
+      pointsReussite: 10, pointsEchec: 10,
+      sanAtout: false, cartesVisibles: false,
+      priorite: 1.8,
+      disponibleSi: (main, meilleureEnchere, joueurId) => {
+        return meilleureEnchere?.id === 'propose' && meilleureEnchere.joueurId === joueurId;
+      },
+    },
+    {
       id: 'solo_6',
       nom: 'Solo 6',
       description: 'Faire 6 plis seul.',
@@ -110,10 +123,21 @@ export const WhistGand: VariantConfig = {
       description: 'Forcé avec 3 As. 9 plis avec le 4ème As.',
       plisMin: 9, plisMax: 13,
       seul: false, partenaire: true,
-      pointsReussite: 30, pointsEchec: 30, // Souvent égal à Petite Misère ou Abondance
+      pointsReussite: 30, pointsEchec: 30,
       sanAtout: false, cartesVisibles: false,
       priorite: 7,
       disponibleSi: (main) => main.filter(c => c.valeur === 14).length === 3,
+    },
+    {
+      id: 'trou_royal',
+      nom: 'Trou Royal',
+      description: 'Forcé avec 4 As. 9 plis avec le Roi de Cœur.',
+      plisMin: 9, plisMax: 13,
+      seul: false, partenaire: true,
+      pointsReussite: 60, pointsEchec: 60,
+      sanAtout: false, cartesVisibles: false,
+      priorite: 7.5,
+      disponibleSi: (main) => main.filter(c => c.valeur === 14).length === 4,
     },
     {
       id: 'abondance_10',
@@ -144,6 +168,16 @@ export const WhistGand: VariantConfig = {
       pointsReussite: 70, pointsEchec: 70,
       sanAtout: false, cartesVisibles: false,
       priorite: 10,
+    },
+    {
+      id: 'abondance_12',
+      nom: 'Abondance 12',
+      description: 'Faire 12 plis seul.',
+      plisMin: 12, plisMax: 13,
+      seul: true, partenaire: false,
+      pointsReussite: 100, pointsEchec: 100,
+      sanAtout: false, cartesVisibles: false,
+      priorite: 10.5,
     },
     {
       id: 'misere_ouverte',

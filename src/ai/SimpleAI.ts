@@ -3,7 +3,7 @@
 // ─────────────────────────────────────────────
 
 import { Carte, Couleur, Pli, ContratJoue, Joueur } from '../engine/types';
-import { cartesJouables, estPlusForte, determinerGagnant } from '../engine/rules';
+import { cartesJouables, estPlusForte, determinerGagnant, determinerCouleursEpuiseesMisere } from '../engine/rules';
 import {
   evaluerForceMain,
   couleurLaPlusLongue,
@@ -27,6 +27,7 @@ export function choisirCarte(
   contrat: ContratJoue | null,
   cartesDejaJouees: Carte[],
   niveau: NiveauIA,
+  plisTermines: Pli[] = [],
 ): Carte {
   const jouables = cartesJouables(joueur.main, pli, atout ?? undefined);
 
@@ -39,9 +40,9 @@ export function choisirCarte(
     return choisirCarteAleatoire(jouables);
   }
   if (niveau === 'moyen') {
-    return choisirCarteMoyen(jouables, pli, atout, contrat, joueur.id);
+    return choisirCarteMoyen(jouables, pli, atout, contrat, joueur.id, plisTermines);
   }
-  return choisirCarteExpert(jouables, pli, atout, contrat, cartesDejaJouees, joueur.main, joueur.id);
+  return choisirCarteExpert(jouables, pli, atout, contrat, cartesDejaJouees, joueur.main, joueur.id, plisTermines);
 }
 
 // ─── Niveau 1 : Aléatoire ──────────────────────
@@ -58,6 +59,7 @@ function choisirCarteMoyen(
   atout: Couleur | null,
   contrat: ContratJoue | null,
   joueurId: number,
+  plisTermines: Pli[] = [],
 ): Carte {
   const estSolisteMisere = contrat?.id.includes('misere') && contrat.joueurId === joueurId;
   const estContreMisere = contrat?.id.includes('misere') && contrat.joueurId !== joueurId;
@@ -67,7 +69,7 @@ function choisirCarteMoyen(
     return eviterPrendreMain(jouables, pli, atout);
   }
   if (estContreMisere) {
-    return forcerPrendreMain(jouables, pli, atout);
+    return strategieContreMisere(jouables, pli, atout, contrat, plisTermines, joueurId);
   }
 
   // Entame : jouer une carte forte ou l'As
@@ -90,12 +92,61 @@ function choisirCarteMoyen(
   return choisirPetiteCarteInutile(jouables, atout);
 }
 
+function strategieContreMisere(
+  jouables: Carte[],
+  pli: Pli,
+  atout: Couleur | null,
+  contrat: ContratJoue | null,
+  plisTermines: Pli[] = [],
+  joueurId: number,
+): Carte {
+  const solisteId = contrat?.joueurId ?? -1;
+
+  // 1. Déterminer les couleurs que le soliste n'a plus (renonces / chicanes connues)
+  const couleursEpuisees = determinerCouleursEpuiseesMisere(solisteId, plisTermines, pli);
+
+  // 2. CAS ENTAME (Premier à jouer dans le pli)
+  if (pli.cartesJouees.length === 0) {
+    // Ne plus jouer une couleur que le soliste n'a plus !
+    const jouablesAutorisees = jouables.filter(c => !couleursEpuisees.has(c.couleur));
+
+    // Si on a le choix (il reste des couleurs que le soliste possède), on ne joue PAS une couleur épuisée
+    const candidates = jouablesAutorisees.length > 0 ? jouablesAutorisees : jouables;
+
+    // Parmi les candidates, on joue la carte la plus forte pour forcer le soliste à monter ou prendre
+    return [...candidates].sort((a, b) => b.valeur - a.valeur)[0];
+  }
+
+  // 3. CAS EN COURS DE PLI
+  const couleurDemandee = pli.couleurDemandee;
+
+  // Le soliste a-t-il déjà joué dans ce pli ?
+  const carteSoliste = pli.cartesJouees.find(c => c.joueurId === solisteId)?.carte;
+
+  if (carteSoliste) {
+    // Si le soliste a fourni la couleur demandée, on essaie de le laisser gagner le pli !
+    if (couleurDemandee && carteSoliste.couleur === couleurDemandee) {
+      // Trouver les cartes jouables plus PETITES que celle du soliste
+      const plusPetitesQueSoliste = jouables.filter(
+        c => c.couleur === couleurDemandee && c.valeur < carteSoliste.valeur
+      );
+
+      if (plusPetitesQueSoliste.length > 0) {
+        // Jouer la plus petite carte sous celle du soliste pour le forcer à garder le pli
+        return plusPetitesQueSoliste.sort((a, b) => a.valeur - b.valeur)[0];
+      }
+    }
+  }
+
+  // Par défaut : Jouer la plus forte carte jouable
+  return [...jouables].sort((a, b) => b.valeur - a.valeur)[0];
+}
+
 function forcerPrendreMain(
   jouables: Carte[],
   pli: Pli,
   atout: Couleur | null,
 ): Carte {
-  // Jouer la plus grosse carte possible pour forcer le soliste
   return [...jouables].sort((a, b) => b.valeur - a.valeur)[0];
 }
 
@@ -109,6 +160,7 @@ function choisirCarteExpert(
   cartesDejaJouees: Carte[],
   mainComplete: Carte[],
   joueurId: number,
+  plisTermines: Pli[] = [],
 ): Carte {
   const estSolisteMisere = contrat?.id.includes('misere') && contrat.joueurId === joueurId;
   const estContreMisere = contrat?.id.includes('misere') && contrat.joueurId !== joueurId;
@@ -117,7 +169,7 @@ function choisirCarteExpert(
     return strategieMisere(jouables, pli, atout, cartesDejaJouees);
   }
   if (estContreMisere) {
-    return forcerPrendreMain(jouables, pli, atout);
+    return strategieContreMisere(jouables, pli, atout, contrat, plisTermines, joueurId);
   }
 
   // Entame intelligente
@@ -294,11 +346,11 @@ function evaluerForceAvancee(main: Carte[]): { force: number, meilleureCol: Coul
     return acc;
   }, 0);
 
-  // Analyse distribution
-  const repart: Record<string, number> = { [Couleur.PIQUE]: 0, [Couleur.COEUR]: 0, [Couleur.CARREAU]: 0, [Couleur.TREFLE]: 0 };
+  // Analyse distribution (Ordre par défaut : Cœur, Carreau, Trèfle, Pique)
+  const repart: Record<string, number> = { [Couleur.COEUR]: 0, [Couleur.CARREAU]: 0, [Couleur.TREFLE]: 0, [Couleur.PIQUE]: 0 };
   main.forEach(c => repart[c.couleur]++);
 
-  let meilleureCol = Couleur.PIQUE;
+  let meilleureCol = Couleur.COEUR;
   let nbAtouts = 0;
   Object.entries(repart).forEach(([col, nb]) => {
     if (nb > nbAtouts) {
@@ -338,10 +390,10 @@ export function choisirEnchere(
   if (variante.id === 'whist-gand') {
     const nbAs = main.filter(c => c.valeur === 14).length;
 
-    // "Trou" (9 plis avec partenaire imposé)
-    if (nbAs === 3 && currentPriorite < 2 && force >= 18) {
+    // "Trou" (9 plis avec partenaire imposé par le 4ème As)
+    if (nbAs === 3 && currentPriorite < 7) {
       const asPossedes = main.filter(c => c.valeur === 14).map(c => c.couleur);
-      const asManquant = [Couleur.PIQUE, Couleur.COEUR, Couleur.CARREAU, Couleur.TREFLE]
+      const asManquant = [Couleur.COEUR, Couleur.CARREAU, Couleur.TREFLE, Couleur.PIQUE]
         .find(col => !asPossedes.includes(col));
 
       return {
@@ -352,7 +404,8 @@ export function choisirEnchere(
       };
     }
 
-    if (nbAs === 4 && currentPriorite < 3) {
+    // "Trou Royal" (4 As en main, appelle le Roi de Cœur)
+    if (nbAs === 4 && currentPriorite < 7.5) {
       return {
         action: 'enchere',
         contratId: 'trou_royal',
@@ -399,7 +452,8 @@ export function choisirEnchere(
 
   if (force >= seuils.abondance && nbAtouts >= 7 && aHonneurAtout) {
     // Chercher le meilleur contrat d'Abondance possible selon les points
-    if (force >= 45) contratChoisi = contratsDisponibles.find(c => c.id === 'chelem') ?? null;
+    if (force >= 48) contratChoisi = contratsDisponibles.find(c => c.id === 'chelem') ?? null;
+    if (!contratChoisi && force >= 44) contratChoisi = contratsDisponibles.find(c => c.id === 'abondance_12') ?? null;
     if (!contratChoisi && force >= 40) contratChoisi = contratsDisponibles.find(c => c.id === 'abondance_11') ?? null;
     if (!contratChoisi && force >= 35) contratChoisi = contratsDisponibles.find(c => c.id === 'abondance_10') ?? null;
     if (!contratChoisi && force >= 30 && nbAtouts >= 6) contratChoisi = contratsDisponibles.find(c => c.id === 'abondance_9') ?? null;
@@ -434,7 +488,7 @@ export function choisirEnchere(
   let asPartenaire: string | undefined;
   if (contratChoisi.partenaire) {
     const asDispo = main.filter(c => c.valeur === Valeur.AS);
-    const asAbsent = [Couleur.PIQUE, Couleur.COEUR, Couleur.CARREAU, Couleur.TREFLE]
+    const asAbsent = [Couleur.COEUR, Couleur.CARREAU, Couleur.TREFLE, Couleur.PIQUE]
       .find(col => !asDispo.some(c => c.couleur === col));
     asPartenaire = asAbsent ? `14_${asAbsent}` : undefined;
   }

@@ -7,10 +7,10 @@ import { Carte, Couleur, Valeur } from './types';
 // ─── Labels affichage ──────────────────────────
 
 export const SYMBOLE: Record<Couleur, string> = {
-  [Couleur.PIQUE]:   '♠',
   [Couleur.COEUR]:   '♥',
   [Couleur.CARREAU]: '♦',
   [Couleur.TREFLE]:  '♣',
+  [Couleur.PIQUE]:   '♠',
 };
 
 export const LABEL_VALEUR: Record<number, string> = {

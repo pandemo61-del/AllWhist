@@ -11,9 +11,7 @@ import { VariantConfig } from '../variants/types';
 import { Colors, Spacing, FontSize, FontWeight, Radius } from '../constants/theme';
 import { useTranslation } from '../i18n';
 
-if (Platform.OS === 'android') {
-  UIManager.setLayoutAnimationEnabledExperimental?.(true);
-}
+// LayoutAnimation n'est plus requis en Nouvelle Architecture
 
 export const VariantCard: React.FC<VariantCardProps> = ({
   variante,

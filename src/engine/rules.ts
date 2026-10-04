@@ -144,3 +144,34 @@ export function mancheTerminee(plisTermines: Pli[], contrat?: ContratJoue): bool
   const totalAttendu = (contrat?.id === 'petite_misere') ? 12 : 13;
   return plisTermines.length >= totalAttendu;
 }
+
+// ─── Couleurs épuisées chez le soliste (Misère) ───
+
+/**
+ * Détermine les couleurs que le soliste de la misère n'a plus (renonces / chicanes connues).
+ */
+export function determinerCouleursEpuiseesMisere(
+  solisteId: number,
+  plisTermines: Pli[] = [],
+  pliEnCours?: Pli,
+): Set<Couleur> {
+  const epuisees = new Set<Couleur>();
+
+  for (const p of plisTermines) {
+    if (!p.couleurDemandee) continue;
+    const carteSoliste = p.cartesJouees.find(c => c.joueurId === solisteId);
+    if (carteSoliste && carteSoliste.carte.couleur !== p.couleurDemandee) {
+      epuisees.add(p.couleurDemandee);
+    }
+  }
+
+  if (pliEnCours && pliEnCours.couleurDemandee) {
+    const carteSoliste = pliEnCours.cartesJouees.find(c => c.joueurId === solisteId);
+    if (carteSoliste && carteSoliste.carte.couleur !== pliEnCours.couleurDemandee) {
+      epuisees.add(pliEnCours.couleurDemandee);
+    }
+  }
+
+  return epuisees;
+}
+

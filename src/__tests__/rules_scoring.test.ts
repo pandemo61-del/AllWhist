@@ -1,5 +1,5 @@
 import { determinerGagnant, compterPlisParJoueur } from '../engine/rules';
-import { evaluerReussite, calculerScoreGenerique, calculerScoreBoston, calculerScoreSolo } from '../engine/scoring';
+import { evaluerReussite, calculerScoreGenerique, calculerScoreWhistBelge, calculerScoreBoston, calculerScoreSolo } from '../engine/scoring';
 import { Couleur, Pli, ContratJoue, Carte } from '../engine/types';
 
 // Helper pour créer une carte rapidement
@@ -85,57 +85,97 @@ describe('Moteur de jeu - Règles et Scores', () => {
     });
   });
 
-  describe('Calcul des scores (Whist de Gand / Générique)', () => {
-    test('Calcul score Solo réussi (0 gagne, les autres perdent)', () => {
+  describe('Calcul des scores Whist Belge (calculerScoreWhistBelge)', () => {
+    test('Propose & Emballe réussi sans surplis (8 plis)', () => {
       const contrat: ContratJoue = {
-        id: 'solo', nom: 'Solo', joueurId: 0, plisObjectif: 5, pointsReussite: 50, pointsEchec: 50
+        id: 'emballe', nom: "J'emballe", joueurId: 0, partenaireId: 2, plisObjectif: 8, pointsReussite: 10, pointsEchec: 10, priorite: 1.5, seul: false, sanAtout: false, cartesVisibles: false
       };
-      const res = calculerScoreGenerique(contrat, { 0: 5, 1: 3, 2: 3, 3: 2 });
+      const res = calculerScoreWhistBelge(contrat, { 0: 5, 1: 2, 2: 3, 3: 3 });
       expect(res.reussite).toBe(true);
-      expect(res.deltaScores[0]).toBe(50);
-      expect(res.deltaScores[1]).toBe(-5);
-      expect(res.deltaScores[2]).toBe(-5);
-      expect(res.deltaScores[3]).toBe(-5);
+      expect(res.deltaScores[0]).toBe(10);
+      expect(res.deltaScores[2]).toBe(10);
+      expect(res.deltaScores[1]).toBe(-10);
+      expect(res.deltaScores[3]).toBe(-10);
+      // Somme nulle
+      expect(Object.values(res.deltaScores).reduce((a, b) => a + b, 0)).toBe(0);
     });
 
-    test('Calcul score Demande réussi (0 et 2 gagnent)', () => {
+    test('Propose & Emballe réussi avec 2 surplis (10 plis)', () => {
       const contrat: ContratJoue = {
-        id: 'demande', nom: 'Demande', joueurId: 0, partenaireId: 2, plisObjectif: 8, pointsReussite: 40, pointsEchec: 40
+        id: 'emballe', nom: "J'emballe", joueurId: 0, partenaireId: 2, plisObjectif: 8, pointsReussite: 10, pointsEchec: 10, priorite: 1.5, seul: false, sanAtout: false, cartesVisibles: false
       };
-      const res = calculerScoreGenerique(contrat, { 0: 5, 1: 2, 2: 3, 3: 3 });
-      expect(res.deltaScores[0]).toBe(40);
-      expect(res.deltaScores[2]).toBe(20); // Partenaire gagne la moitié
-      expect(res.deltaScores[1]).toBe(-5);
-      expect(res.deltaScores[3]).toBe(-5);
+      const res = calculerScoreWhistBelge(contrat, { 0: 6, 1: 2, 2: 4, 3: 1 });
+      expect(res.reussite).toBe(true);
+      expect(res.deltaScores[0]).toBe(12); // 10 + 2 surplis
+      expect(res.deltaScores[2]).toBe(12);
+      expect(res.deltaScores[1]).toBe(-12);
+      expect(res.deltaScores[3]).toBe(-12);
+      expect(Object.values(res.deltaScores).reduce((a, b) => a + b, 0)).toBe(0);
     });
 
-    test('Calcul score Solo échoué', () => {
+    test('Solo 6 réussi avec 2 surplis (8 plis = 17 pts/défenseur)', () => {
       const contrat: ContratJoue = {
-        id: 'solo', nom: 'Solo', joueurId: 0, plisObjectif: 5, pointsReussite: 50, pointsEchec: 60
+        id: 'solo_6', nom: 'Solo 6', joueurId: 0, plisObjectif: 6, pointsReussite: 15, pointsEchec: 15, priorite: 2, seul: true, sanAtout: false, cartesVisibles: false
       };
-      const res = calculerScoreGenerique(contrat, { 0: 4, 1: 4, 2: 3, 3: 2 });
-      expect(res.reussite).toBe(false);
-      expect(res.deltaScores[0]).toBe(-60);
-      expect(res.deltaScores[1]).toBe(20); // Bonus défense (60 / 3 défenseurs)
-      expect(res.deltaScores[2]).toBe(20);
-      expect(res.deltaScores[3]).toBe(20);
+      const res = calculerScoreWhistBelge(contrat, { 0: 8, 1: 2, 2: 2, 3: 1 });
+      expect(res.reussite).toBe(true);
+      expect(res.deltaScores[0]).toBe(51); // (15 + 2) * 3 = 51
+      expect(res.deltaScores[1]).toBe(-17);
+      expect(res.deltaScores[2]).toBe(-17);
+      expect(res.deltaScores[3]).toBe(-17);
+      expect(Object.values(res.deltaScores).reduce((a, b) => a + b, 0)).toBe(0);
     });
 
-    test('Trou (Whist de Gand) : 9 plis avec partenaire', () => {
+    test('Trou réussi avec 1 surplis (10 plis = 31 pts par partenaire)', () => {
       const contrat: ContratJoue = {
-        id: 'trou', nom: 'Trou', joueurId: 0, partenaireId: 3, plisObjectif: 9, pointsReussite: 60, pointsEchec: 60
+        id: 'trou', nom: 'Trou', joueurId: 0, partenaireId: 3, plisObjectif: 9, pointsReussite: 30, pointsEchec: 30, priorite: 7, seul: false, sanAtout: false, cartesVisibles: false
       };
-      // Réussite : 5 + 4 = 9
-      const resOk = calculerScoreGenerique(contrat, { 0: 5, 1: 2, 2: 2, 3: 4 });
-      expect(resOk.reussite).toBe(true);
-      expect(resOk.deltaScores[0]).toBe(60);
-      expect(resOk.deltaScores[3]).toBe(30);
+      const res = calculerScoreWhistBelge(contrat, { 0: 6, 1: 2, 2: 1, 3: 4 });
+      expect(res.reussite).toBe(true);
+      expect(res.deltaScores[0]).toBe(31); // 30 + 1
+      expect(res.deltaScores[3]).toBe(31);
+      expect(res.deltaScores[1]).toBe(-31);
+      expect(res.deltaScores[2]).toBe(-31);
+      expect(Object.values(res.deltaScores).reduce((a, b) => a + b, 0)).toBe(0);
+    });
 
-      // Échec : 4 + 4 = 8
-      const resFail = calculerScoreGenerique(contrat, { 0: 4, 1: 3, 2: 2, 3: 4 });
-      expect(resFail.reussite).toBe(false);
-      expect(resFail.deltaScores[0]).toBe(-60);
-      expect(resFail.deltaScores[3]).toBe(-30);
+    test('Trou Royal réussi sans surplis (9 plis)', () => {
+      const contrat: ContratJoue = {
+        id: 'trou_royal', nom: 'Trou Royal', joueurId: 0, partenaireId: 3, plisObjectif: 9, pointsReussite: 60, pointsEchec: 60, priorite: 7.5, seul: false, sanAtout: false, cartesVisibles: false
+      };
+      const res = calculerScoreWhistBelge(contrat, { 0: 5, 1: 2, 2: 2, 3: 4 });
+      expect(res.reussite).toBe(true);
+      expect(res.deltaScores[0]).toBe(60);
+      expect(res.deltaScores[3]).toBe(60);
+      expect(res.deltaScores[1]).toBe(-60);
+      expect(res.deltaScores[2]).toBe(-60);
+      expect(Object.values(res.deltaScores).reduce((a, b) => a + b, 0)).toBe(0);
+    });
+
+    test('Petite Misère réussie (30 pts par défenseur)', () => {
+      const contrat: ContratJoue = {
+        id: 'petite_misere', nom: 'Petite Misère', joueurId: 0, plisObjectif: 0, pointsReussite: 30, pointsEchec: 30, priorite: 4, seul: true, sanAtout: true, cartesVisibles: false
+      };
+      const res = calculerScoreWhistBelge(contrat, { 0: 0, 1: 5, 2: 4, 3: 3 });
+      expect(res.reussite).toBe(true);
+      expect(res.deltaScores[0]).toBe(90); // 30 * 3
+      expect(res.deltaScores[1]).toBe(-30);
+      expect(res.deltaScores[2]).toBe(-30);
+      expect(res.deltaScores[3]).toBe(-30);
+      expect(Object.values(res.deltaScores).reduce((a, b) => a + b, 0)).toBe(0);
+    });
+
+    test('Chelem réussi (250 pts par défenseur)', () => {
+      const contrat: ContratJoue = {
+        id: 'chelem', nom: 'Chelem', joueurId: 0, plisObjectif: 13, pointsReussite: 250, pointsEchec: 250, priorite: 12, seul: true, sanAtout: false, cartesVisibles: false
+      };
+      const res = calculerScoreWhistBelge(contrat, { 0: 13, 1: 0, 2: 0, 3: 0 });
+      expect(res.reussite).toBe(true);
+      expect(res.deltaScores[0]).toBe(750); // 250 * 3
+      expect(res.deltaScores[1]).toBe(-250);
+      expect(res.deltaScores[2]).toBe(-250);
+      expect(res.deltaScores[3]).toBe(-250);
+      expect(Object.values(res.deltaScores).reduce((a, b) => a + b, 0)).toBe(0);
     });
   });
 

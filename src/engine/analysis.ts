@@ -3,7 +3,7 @@
 // ─────────────────────────────────────────────
 
 import { Pli, ContratJoue, Couleur, Carte } from './types';
-import { determinerGagnant } from './rules';
+import { determinerGagnant, determinerCouleursEpuiseesMisere } from './rules';
 import { LABEL_VALEUR } from './deck';
 
 export type AnalyseType = 'error' | 'warning' | 'good';
@@ -174,7 +174,7 @@ export function analyserPli(
       }
     }
 
-    // --- ANALYSE : MISERE (Entame) ---
+    // --- ANALYSE : MISERE (Entame du soliste) ---
     if (contrat.id.includes('misere') && estSoliste(joueurId) && i === 0) {
       if (carte.valeur >= 9) {
         commentaires.push({
@@ -182,6 +182,19 @@ export function analyserPli(
           titre: 'Entame dangereuse',
           description: `Entamer avec une carte haute (${LABEL_VALEUR[carte.valeur]}) en misère est très risqué. Privilégiez vos plus petites cartes.`,
           joueurId
+        });
+      }
+    }
+
+    // --- ANALYSE : MISERE (Entame des défenseurs) ---
+    if (contrat.id.includes('misere') && !estSoliste(entame.joueurId) && i === 0) {
+      const couleursEpuisees = determinerCouleursEpuiseesMisere(contrat.joueurId, historiquePlis);
+      if (couleursEpuisees.has(entame.carte.couleur)) {
+        commentaires.push({
+          type: 'error',
+          titre: 'Défausse offerte',
+          description: `Vous avez entamé dans une couleur que le soliste n'a plus. Cela lui permet de se défausser gratuitement de ses cartes dangereuses.`,
+          joueurId: entame.joueurId,
         });
       }
     }

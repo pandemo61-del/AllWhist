@@ -112,6 +112,50 @@ const ETAT_INITIAL: EtatPartie = {
 const NOMS_IA = ['Marc', 'Julie', 'Paul'];
 const NIVEAUX_IA: NiveauIA[] = ['moyen', 'moyen', 'expert'];
 
+// Helper pour préparer le contrat d'un scénario d'apprentissage
+function preparerContratScenario(scenario: Scenario, variante: VariantConfig, mainHumain: Carte[]): { contrat: ContratJoue; atout: Couleur | null; phase: PhaseJeu } {
+  const contratId = scenario.contratId || 'solo_6';
+  const config = variante.contrats.find(c => c.id === contratId) || variante.contrats[1] || variante.contrats[0];
+
+  let atout: Couleur | null = scenario.atoutInitial ?? null;
+  if (!atout && !config.sanAtout) {
+    const compte: Record<string, number> = { COEUR: 0, CARREAU: 0, TREFLE: 0, PIQUE: 0 };
+    mainHumain.forEach(c => { if (c.couleur) compte[c.couleur] = (compte[c.couleur] || 0) + 1; });
+    let maxCouleur = Couleur.PIQUE;
+    let maxNb = -1;
+    Object.entries(compte).forEach(([k, v]) => {
+      if (v > maxNb) { maxNb = v; maxCouleur = k as Couleur; }
+    });
+    atout = maxCouleur;
+  }
+
+  let asPartenaire: Carte | undefined = undefined;
+  if (contratId === 'demande' || contratId === 'trou') {
+    asPartenaire = { id: 'AS_TREFLE', valeur: 14 as any, couleur: Couleur.TREFLE };
+  } else if (contratId === 'trou_royal') {
+    asPartenaire = { id: 'ROI_COEUR', valeur: 13 as any, couleur: Couleur.COEUR };
+  }
+
+  const contrat: ContratJoue = {
+    id: config.id,
+    nom: config.nom,
+    joueurId: 0,
+    atout: config.sanAtout ? undefined : (atout ?? undefined),
+    asPartenaire,
+    plisObjectif: config.plisMin,
+    seul: config.seul,
+    sanAtout: config.sanAtout,
+    cartesVisibles: config.cartesVisibles,
+    pointsReussite: config.pointsReussite,
+    pointsEchec: config.pointsEchec,
+    priorite: config.priorite,
+  };
+
+  const phase: PhaseJeu = (contratId === 'petite_misere') ? 'ecart' : 'jeu';
+
+  return { contrat, atout, phase };
+}
+
 // ─── Store ─────────────────────────────────────
 
 export const useGameStore = create<GameStore>()(
@@ -189,15 +233,18 @@ export const useGameStore = create<GameStore>()(
     const variante = getVariante(scenario.varianteId);
     const settings = useSettingsStore.getState();
     const pseudoEffective = nomJoueur || settings.pseudo || 'Vous';
-    const donneur = 0;
+    const donneur = 3;
     const sessionGameId = `S-${Math.random().toString(36).substring(2, 9).toUpperCase()}`;
+
+    const mainHumain = scenario.mains[0];
+    const { contrat, atout, phase } = preparerContratScenario(scenario, variante, mainHumain);
 
     const joueurs: Joueur[] = Array.from({ length: 4 }, (_, i) => ({
       id: i,
       nom: i === 0 ? pseudoEffective : NOMS_IA[i - 1],
       type: i === 0 ? 'humain' : `ia_${NIVEAUX_IA[i - 1]}` as any,
       main: i === 0
-        ? trierMain(scenario.mains[i], scenario.atoutInitial, {
+        ? trierMain(scenario.mains[i], atout ?? undefined, {
             ordreCouleurs: settings.ordreCouleurs,
             ordreValeur: settings.ordreValeur,
             direction: settings.directionTri,
@@ -206,33 +253,25 @@ export const useGameStore = create<GameStore>()(
       plisGagnesTotal: 0,
     }));
 
-    const atout = scenario.atoutInitial ?? null;
-
-    const phaseInitiale: PhaseJeu = settings.animationDonne ? 'distribution' : (variante.atoutChoisi ? 'encheres' : 'jeu');
-
     set({
       ...ETAT_INITIAL,
       varianteId: scenario.varianteId,
       sessionGameId,
-      phase: phaseInitiale,
+      phase, // Directement 'jeu' ou 'ecart' !
       joueurs,
       manche: 1,
       scores: [0, 0, 0, 0],
       atout,
       donneur,
-      tourDeJoueur: (donneur + 1) % 4,
-      etatEnchere: {
-        joueurCourantId: (donneur + 1) % 4,
-        meilleureEnchere: null,
-        passesConsecutifs: 0,
-        historique: [],
-      },
+      tourDeJoueur: 0, // Humain entame
+      contratEnCours: contrat,
       estScenario: true,
+      scenarioActuel: scenario,
+      notification: {
+        title: `🎯 Jouer l'annonce : ${contrat.nom}`,
+        message: `Main et contrat pré-configurés pour « ${scenario.titre} ». Jouez vos cartes pour réaliser l'objectif !`,
+      },
     });
-
-    if (phaseInitiale !== 'distribution' && variante.atoutChoisi && ((donneur + 1) % 4 !== 0 || useSettingsStore.getState().autoEnchere)) {
-      setTimeout(() => get()._faireProchaineActionIA(), 600);
-    }
   },
 
   // ──────────────────────────────────────────
@@ -416,6 +455,10 @@ export const useGameStore = create<GameStore>()(
 
   avancerManche(estRedistribution = false) {
     const state = get();
+    if (state.estScenario && state.scenarioActuel) {
+      get().chargerScenario(state.scenarioActuel);
+      return;
+    }
     const settings = useSettingsStore.getState();
     const MAX = settings.nbManchesParPartie;
 

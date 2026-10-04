@@ -1,16 +1,15 @@
 // ─────────────────────────────────────────────
-//  app/learn/[varianteId].tsx — Tutoriel
+//  app/learn/[varianteId].tsx — Tutoriel & Pratique
 // ─────────────────────────────────────────────
 
 import React, { useState } from 'react';
 import {
-  View, Text, StyleSheet, SafeAreaView,
+  View, Text, StyleSheet,
   ScrollView, TouchableOpacity,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
 import { getVariante } from '../../src/variants/index';
-import { SYMBOLE } from '../../src/engine/deck';
-import { Couleur } from '../../src/engine/types';
 import { useGameStore } from '../../src/store/gameStore';
 import { SCENARIOS, Scenario } from '../../src/data/scenarios';
 import { Colors, Spacing, FontSize, FontWeight, Radius } from '../../src/constants/theme';
@@ -22,6 +21,7 @@ export default function LearnScreen() {
   const { t } = useTranslation();
   const { varianteId } = useLocalSearchParams<{ varianteId: string }>();
   const [onglet, setOnglet] = useState<Onglet>('regles');
+  const [contratFiltre, setContratFiltre] = useState<string | null>(null);
   const { initialiserPartie, chargerScenario } = useGameStore();
 
   const variante = React.useMemo(() => {
@@ -29,8 +29,12 @@ export default function LearnScreen() {
   }, [varianteId]);
 
   const scenariosFiltrés = React.useMemo(() => {
-    return SCENARIOS.filter(s => s.varianteId === varianteId);
-  }, [varianteId]);
+    let list = SCENARIOS.filter(s => s.varianteId === varianteId);
+    if (contratFiltre) {
+      list = list.filter(s => s.contratId === contratFiltre);
+    }
+    return list;
+  }, [varianteId, contratFiltre]);
 
   if (!variante) {
     return (
@@ -43,6 +47,11 @@ export default function LearnScreen() {
   const handleJouer = () => {
     initialiserPartie(variante.id);
     router.replace(`/game/${variante.id}`);
+  };
+
+  const handleLancerScenario = (scenario: Scenario) => {
+    chargerScenario(scenario);
+    router.replace(`/game/${scenario.varianteId}`);
   };
 
   return (
@@ -65,7 +74,7 @@ export default function LearnScreen() {
             <Text style={[styles.ongletTexte, onglet === o && styles.ongletTexteActif]}>
               {{
                 regles: t('learn.tabs.regles'),
-                contrats: t('learn.tabs.contrats'),
+                contrats: t('learn.tabs.contrats') || 'Annonces',
                 conseils: t('learn.tabs.conseils'),
                 scenarios: t('learn.tabs.scenarios') || 'Pratique'
               }[o]}
@@ -95,31 +104,61 @@ export default function LearnScreen() {
           </View>
         )}
 
-        {/* ── Onglet Contrats ────────────────── */}
+        {/* ── Onglet Contrats / Annonces ─────── */}
         {onglet === 'contrats' && (
           <View style={styles.contratsListe}>
-            {variante.contrats.filter(c => c.id !== 'passe').map(c => (
-              <View key={c.id} style={styles.contratCard}>
-                <View style={styles.contratCardHeader}>
-                  <Text style={styles.contratCardNom}>{t(`variants.${variante.id}.contrats.${c.id}.nom`)}</Text>
-                  <View style={styles.contratPts}>
-                    <Text style={styles.contratPtsVal}>+{c.pointsReussite}</Text>
-                    <Text style={styles.contratPtsLabel}> {t('learn.points')}</Text>
+            <Text style={styles.sectionSousTitre}>
+              Découvrez chaque annonce et lancez une partie d'entraînement sur mesure pour étudier la main idéale.
+            </Text>
+
+            {variante.contrats.filter(c => c.id !== 'passe').map(c => {
+              const scenarioAssocie = SCENARIOS.find(
+                s => s.varianteId === variante.id && s.contratId === c.id
+              );
+
+              return (
+                <View key={c.id} style={styles.contratCard}>
+                  <View style={styles.contratCardHeader}>
+                    <Text style={styles.contratCardNom}>{t(`variants.${variante.id}.contrats.${c.id}.nom`)}</Text>
+                    <View style={styles.contratPts}>
+                      <Text style={styles.contratPtsVal}>+{c.pointsReussite}</Text>
+                      <Text style={styles.contratPtsLabel}> {t('learn.points')}</Text>
+                    </View>
                   </View>
+
+                  <Text style={styles.contratCardDesc}>
+                    {t(`variants.${variante.id}.contrats.${c.id}.description`)}
+                  </Text>
+
+                  <View style={styles.contratMeta}>
+                    <MetaTag label={`${t('learn.objective')} : ${c.plisMin === 0 ? `0 ${t('learn.trick')}` : `${c.plisMin} ${t('learn.tricks')}`}`} />
+                    {c.seul && <MetaTag label={t('learn.playsSolo')} color={Colors.warning} />}
+                    {c.partenaire && <MetaTag label={t('learn.withPartner')} color={Colors.info} />}
+                    {c.sanAtout && <MetaTag label={t('learn.noTrump')} />}
+                    {c.cartesVisibles && <MetaTag label={t('learn.visibleCards')} color={Colors.cardRed} />}
+                    <MetaTag label={`${t('learn.failure')} : −${c.pointsEchec} ${t('learn.points')}`} color={Colors.cardRed} />
+                  </View>
+
+                  {/* Bouton direct pour jouer l'annonce */}
+                  {scenarioAssocie && (
+                    <TouchableOpacity
+                      style={styles.btnTesterAnnonce}
+                      onPress={() => handleLancerScenario(scenarioAssocie)}
+                    >
+                      <View style={styles.btnTesterAnnonceHeader}>
+                        <Text style={styles.btnTesterAnnonceEmoji}>🎯</Text>
+                        <Text style={styles.btnTesterAnnonceTitre}>
+                          Jouer l'annonce
+                        </Text>
+                      </View>
+                      <Text style={styles.btnTesterAnnonceSousTitre}>
+                        Mise en situation : « {scenarioAssocie.titre} » →
+                      </Text>
+                    </TouchableOpacity>
+                  )}
                 </View>
-                <Text style={styles.contratCardDesc}>
-                  {t(`variants.${variante.id}.contrats.${c.id}.description`)}
-                </Text>
-                <View style={styles.contratMeta}>
-                  <MetaTag label={`${t('learn.objective')} : ${c.plisMin === 0 ? `0 ${t('learn.trick')}` : `${c.plisMin} ${t('learn.tricks')}`}`} />
-                  {c.seul && <MetaTag label={t('learn.playsSolo')} color={Colors.warning} />}
-                  {c.partenaire && <MetaTag label={t('learn.withPartner')} color={Colors.info} />}
-                  {c.sanAtout && <MetaTag label={t('learn.noTrump')} />}
-                  {c.cartesVisibles && <MetaTag label={t('learn.visibleCards')} color={Colors.cardRed} />}
-                  <MetaTag label={`${t('learn.failure')} : −${c.pointsEchec} ${t('learn.points')}`} color={Colors.cardRed} />
-                </View>
-              </View>
-            ))}
+              );
+            })}
           </View>
         )}
 
@@ -138,34 +177,86 @@ export default function LearnScreen() {
           </View>
         )}
 
-        {/* ── Onglet Scénarios ────────────────── */}
+        {/* ── Onglet Scénarios / Parties ────── */}
         {onglet === 'scenarios' && (
           <View style={styles.scenariosListe}>
             <Text style={styles.sectionSousTitre}>
-              Parties prédéfinies pour s'entraîner aux annonces
+              Sélectionnez une annonce à étudier pour jouer une partie préconfigurée avec des cartes ciblées.
             </Text>
-            {scenariosFiltrés.map(scenario => (
+
+            {/* Filtre par annonce */}
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              style={styles.filtresScroll}
+              contentContainerStyle={styles.filtresContainer}
+            >
               <TouchableOpacity
-                key={scenario.id}
-                style={styles.scenarioCard}
-                onPress={() => {
-                  chargerScenario(scenario);
-                  router.replace(`/game/${scenario.varianteId}`);
-                }}
+                style={[styles.filtreChip, contratFiltre === null && styles.filtreChipActif]}
+                onPress={() => setContratFiltre(null)}
               >
-                <View style={styles.scenarioHeader}>
-                  <Text style={styles.scenarioTitre}>{scenario.titre}</Text>
-                  <Text style={styles.scenarioGo}>Lancer →</Text>
-                </View>
-                <Text style={styles.scenarioDesc}>{scenario.description}</Text>
+                <Text style={[styles.filtreChipTexte, contratFiltre === null && styles.filtreChipTexteActif]}>
+                  Toutes les annonces
+                </Text>
               </TouchableOpacity>
-            ))}
+
+              {variante.contrats.filter(c => c.id !== 'passe').map(c => {
+                const aScenario = SCENARIOS.some(s => s.varianteId === variante.id && s.contratId === c.id);
+                if (!aScenario) return null;
+                const nomContrat = t(`variants.${variante.id}.contrats.${c.id}.nom`) || c.nom;
+                return (
+                  <TouchableOpacity
+                    key={c.id}
+                    style={[styles.filtreChip, contratFiltre === c.id && styles.filtreChipActif]}
+                    onPress={() => setContratFiltre(c.id === contratFiltre ? null : c.id)}
+                  >
+                    <Text style={[styles.filtreChipTexte, contratFiltre === c.id && styles.filtreChipTexteActif]}>
+                      {nomContrat}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+
+            {/* Liste des scénarios */}
+            {scenariosFiltrés.length === 0 ? (
+              <Text style={styles.aucunScenario}>
+                Aucune partie d'entraînement spécifique pour cette sélection.
+              </Text>
+            ) : (
+              scenariosFiltrés.map(scenario => {
+                const nomAnnonce = scenario.contratId
+                  ? t(`variants.${variante.id}.contrats.${scenario.contratId}.nom`) || scenario.contratId
+                  : null;
+
+                return (
+                  <TouchableOpacity
+                    key={scenario.id}
+                    style={styles.scenarioCard}
+                    onPress={() => handleLancerScenario(scenario)}
+                  >
+                    <View style={styles.scenarioHeader}>
+                      <View style={styles.scenarioTitreRow}>
+                        <Text style={styles.scenarioTitre}>{scenario.titre}</Text>
+                        {nomAnnonce && (
+                          <View style={styles.annonceBadge}>
+                            <Text style={styles.annonceBadgeTexte}>Annonce : {nomAnnonce}</Text>
+                          </View>
+                        )}
+                      </View>
+                      <Text style={styles.scenarioGo}>Jouer l'annonce →</Text>
+                    </View>
+                    <Text style={styles.scenarioDesc}>{scenario.description}</Text>
+                  </TouchableOpacity>
+                );
+              })
+            )}
           </View>
         )}
 
       </ScrollView>
 
-      {/* Bouton jouer */}
+      {/* Bouton jouer partie normale */}
       <View style={styles.footer}>
         <TouchableOpacity style={styles.btnJouer} onPress={handleJouer}>
           <Text style={styles.btnJouerTexte}>
@@ -317,7 +408,7 @@ const styles = StyleSheet.create({
   scroll: { flex: 1 },
   scrollContent: {
     padding: Spacing.md,
-    paddingBottom: Spacing.xxxl,
+    paddingBottom: Spacing.xxl,
   },
 
   regleRow: {
@@ -378,6 +469,36 @@ const styles = StyleSheet.create({
   },
   contratMeta: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.xs },
 
+  // Bouton tester annonce
+  btnTesterAnnonce: {
+    marginTop: Spacing.md,
+    padding: Spacing.sm,
+    paddingHorizontal: Spacing.md,
+    backgroundColor: Colors.primaryDark + '33',
+    borderRadius: Radius.md,
+    borderWidth: 1,
+    borderColor: Colors.primary + '66',
+  },
+  btnTesterAnnonceHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.xs,
+  },
+  btnTesterAnnonceEmoji: {
+    fontSize: 14,
+  },
+  btnTesterAnnonceTitre: {
+    fontSize: FontSize.xs,
+    fontWeight: FontWeight.bold,
+    color: Colors.primaryLight,
+  },
+  btnTesterAnnonceSousTitre: {
+    fontSize: 11,
+    color: Colors.textSecondary,
+    marginTop: 2,
+    fontStyle: 'italic',
+  },
+
   conseilCard: {
     flexDirection: 'row',
     gap: Spacing.md,
@@ -408,8 +529,41 @@ const styles = StyleSheet.create({
   sectionSousTitre: {
     fontSize: FontSize.xs,
     color: Colors.textMuted,
+    marginBottom: Spacing.sm,
+    lineHeight: 16,
+  },
+  filtresScroll: {
     marginBottom: Spacing.md,
-    fontStyle: 'italic',
+  },
+  filtresContainer: {
+    gap: Spacing.xs,
+    paddingVertical: 2,
+  },
+  filtreChip: {
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.xs,
+    borderRadius: Radius.full,
+    backgroundColor: Colors.bgCard,
+    borderWidth: 0.5,
+    borderColor: Colors.border,
+  },
+  filtreChipActif: {
+    backgroundColor: Colors.primary,
+    borderColor: Colors.primary,
+  },
+  filtreChipTexte: {
+    fontSize: FontSize.xs,
+    color: Colors.textMuted,
+  },
+  filtreChipTexteActif: {
+    color: '#fff',
+    fontWeight: FontWeight.bold,
+  },
+  aucunScenario: {
+    textAlign: 'center',
+    color: Colors.textMuted,
+    fontSize: FontSize.sm,
+    marginVertical: Spacing.lg,
   },
   scenarioCard: {
     backgroundColor: Colors.bgCard,
@@ -417,22 +571,41 @@ const styles = StyleSheet.create({
     padding: Spacing.md,
     borderWidth: 0.5,
     borderColor: Colors.border,
+    marginBottom: Spacing.xs,
   },
   scenarioHeader: {
+    flexDirection: 'column',
+    gap: 4,
+    marginBottom: 6,
+  },
+  scenarioTitreRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 4,
+    justifyContent: 'space-between',
+    flexWrap: 'wrap',
+    gap: Spacing.xs,
   },
   scenarioTitre: {
     fontSize: FontSize.md,
     fontWeight: FontWeight.semibold,
     color: Colors.primary,
   },
+  annonceBadge: {
+    backgroundColor: Colors.primaryDark,
+    borderRadius: Radius.sm,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+  },
+  annonceBadgeTexte: {
+    fontSize: 10,
+    color: Colors.primaryLight,
+    fontWeight: FontWeight.medium,
+  },
   scenarioGo: {
-    fontSize: FontSize.sm,
+    fontSize: FontSize.xs,
     fontWeight: FontWeight.bold,
     color: Colors.primary,
+    alignSelf: 'flex-end',
   },
   scenarioDesc: {
     fontSize: FontSize.sm,

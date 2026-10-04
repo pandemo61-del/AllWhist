@@ -37,7 +37,7 @@ async function runSimulation(count = 50) {
             if (decision.action === 'passe') passes++;
             else {
                 passes = 0;
-                meilleureEnchere = { ...decision, joueurId: id }; // Simplifié pour le stub
+                meilleureEnchere = { ...decision, joueurId: id };
             }
             tour++;
             if (tour > 20) break;
@@ -84,11 +84,7 @@ async function runSimulation(count = 50) {
         details: results
     };
 
-    fs.writeFileSync('./admin/ia-report.json', JSON.stringify(report, null, 2));
-    console.log(`Simulation terminée. Rapport généré dans admin/ia-report.json`);
+    fs.writeFileSync('./web/ia-report.json', JSON.stringify(report, null, 2));
+    console.log(`Simulation terminée. Rapport généré dans web/ia-report.json`);
     console.log(`Taux de réussite: ${report.rate}`);
 }
-
-// Note: Ce script nécessite que les fichiers source soient compilés ou supportés par Node (require)
-// Dans un projet Expo/TS, il est préférable de l'exécuter via ts-node ou jest.
-// runSimulation();
