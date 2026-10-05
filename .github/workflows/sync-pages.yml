@@ -1,0 +1,56 @@
+name: Sync Admin & Web to GitHub Pages
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'admin/**'
+      - 'web/**'
+  workflow_dispatch:
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Display deployment information
+        run: |
+          echo "========================================="
+          echo "Source Admin : AllWhist/admin"
+          echo "Source Web   : AllWhist/web"
+          echo "Destination  : pandemo61-del.github.io/allwhist"
+          echo "Commit       : ${{ github.sha }}"
+          echo "Actor        : ${{ github.actor }}"
+          echo "========================================="
+
+      - name: Deploy Admin to allwhist/admin
+        uses: JamesIves/github-pages-deploy-action@v4
+        with:
+          token: ${{ secrets.PAGES_TOKEN }}
+          repository-name: pandemo61-del/pandemo61-del.github.io
+          branch: main
+          folder: admin
+          target-folder: allwhist/admin
+          clean: false
+
+      - name: Deploy Web to allwhist/web
+        uses: JamesIves/github-pages-deploy-action@v4
+        with:
+          token: ${{ secrets.PAGES_TOKEN }}
+          repository-name: pandemo61-del/pandemo61-del.github.io
+          branch: main
+          folder: web
+          target-folder: allwhist/web
+          clean: false
+
+      - name: Deployment summary
+        run: |
+          echo "========================================="
+          echo "✅ Sync completed"
+          echo "🌐 Admin : https://pandemo61-del.github.io/allwhist/admin/"
+          echo "🌐 Web   : https://pandemo61-del.github.io/allwhist/web/"
+          echo "========================================="
