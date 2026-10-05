@@ -1,4 +1,4 @@
-name: Sync Web to GitHub Pages
+name: Sync AllWhist Web
 
 on:
   push:
@@ -6,6 +6,7 @@ on:
       - main
     paths:
       - 'web/**'
+
   workflow_dispatch:
 
 jobs:
@@ -13,32 +14,43 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout source repository
+        uses: actions/checkout@v4
 
-      - name: Display deployment information
-        run: |
-          echo "========================================="
-          echo "Source      : AllWhist/web"
-          echo "Destination : pandemo61-del.github.io/allwhist"
-          echo "Commit      : ${{ github.sha }}"
-          echo "Actor       : ${{ github.actor }}"
-          echo "========================================="
-
-      - name: Deploy web to allwhist
-        uses: JamesIves/github-pages-deploy-action@v4
+      - name: Checkout destination repository
+        uses: actions/checkout@v4
         with:
-          token: ${{ secrets.PAGES_TOKEN }}
-          repository-name: pandemo61-del/pandemo61-del.github.io
-          branch: main
-          folder: web
-          target-folder: allwhist
-          clean: false
+          repository: pandemo61-del/pandemo61-del.github.io
+          token: ${{ secrets.PAGES_SYNC_TOKEN }}
+          path: destination
 
-      - name: Deployment summary
+      - name: Show paths
         run: |
-          echo "========================================="
-          echo "✅ Deployment completed"
-          echo "📂 Copied : AllWhist/web"
-          echo "📂 To     : pandemo61-del.github.io/allwhist"
-          echo "🌐 Site   : https://pandemo61-del.github.io/allwhist/"
-          echo "========================================="
+          echo "Source      : AllWhist/web"
+          echo "Destination : pandemo61-del.github.io/allwhist/web"
+
+      - name: Create destination folder
+        run: |
+          mkdir -p destination/allwhist/web
+
+      - name: Synchronize files
+        run: |
+          rsync -av --delete \
+            web/ \
+            destination/allwhist/web/
+
+      - name: Commit changes
+        run: |
+          cd destination
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add allwhist/web
+
+          if git diff --cached --quiet; then
+            echo "No changes detected."
+          else
+            git commit -m "Sync web from AllWhist"
+            git push origin main
+          fi
