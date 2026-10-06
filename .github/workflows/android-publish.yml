@@ -52,7 +52,7 @@ jobs:
         run: npm install
 
       - name: Verify Expo dependencies
-        run: npx expo install --check
+        run: npx expo install --fix
 
       - name: Generate Android project
         run: npx expo prebuild --platform android --clean
