@@ -2,7 +2,7 @@
   "expo": {
     "name": "allWhist",
     "slug": "allwhist",
-    "version": "1.1.1",
+    "version": "1.1.2",
 
     "orientation": "default",
     "scheme": "allwhist",
@@ -19,7 +19,7 @@
 
     "android": {
       "package": "com.allwhist.app",
-      "versionCode": 7,
+      "versionCode": 8,
       "softwareKeyboardLayoutMode": "resize",
       "adaptiveIcon": {
         "foregroundImage": "./assets/allwhist_adaptive_108x108.png",
