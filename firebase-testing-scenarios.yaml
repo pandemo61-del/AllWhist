@@ -1,42 +1,77 @@
+version: 1.2
 tests:
   - displayName: Anonymous login
     id: auth_001
     steps:
-      - goal: Launch the app and sign in anonymously.
-        finalScreenAssertion: The user is authenticated and the session is active.
+      - goal: Tap the anonymous login button
+        hint: Look for a button labeled "Sign in anonymously" or "Guest login" on the welcome screen
+        finalScreenAssertion: The main screen appears with a user profile or game list visible
 
   - displayName: Google login
     id: auth_002
+    prerequisiteTestCaseId: auth_001
     steps:
-      - goal: Sign in with Google using the authentication flow.
-        finalScreenAssertion: The user is successfully authenticated and has a valid email address.
+      - goal: Navigate to the login screen and tap the Google login button
+        hint: Look for a button labeled "Sign in with Google" or a Google icon
+        finalScreenAssertion: The Google login popup appears or the user is redirected to the home screen with their profile visible
+
+  - displayName: Define username
+    id: profile_001
+    prerequisiteTestCaseId: auth_001
+    steps:
+      - goal: Open settings or profile screen and enter a username
+        hint: Look for a "Settings", "Profile", or "Edit profile" button; tap it and find a text field for username
+        finalScreenAssertion: The username input field displays the text entered and a "Save" button is visible
 
   - displayName: Save user settings
     id: firestore_001
+    prerequisiteTestCaseId: profile_001
     steps:
-      - goal: Open the settings screen and save the user preferences in French with notifications enabled.
-        finalScreenAssertion: The preferences are persisted successfully and the app confirms the save.
+      - goal: Open the settings menu and scroll to language and audio preferences
+        hint: Look for buttons labeled "Settings", "Preferences", or a gear icon
+        finalScreenAssertion: Settings screen displays options for language (French), vibration toggle, and sound toggle
+      - goal: Set language to French, disable auto-play, and enable vibration and sound
+        hint: Tap the language dropdown and select French; toggle vibration and sound switches to ON
+        finalScreenAssertion: All settings are updated visually and a confirmation message or "Save" button appears
 
   - displayName: Save completed game
     id: firestore_002
+    prerequisiteTestCaseId: profile_001
     steps:
-      - goal: Complete a game and save the result to the games collection.
-        finalScreenAssertion: The game result is stored successfully and the app confirms the creation of the record.
+      - goal: Start and complete a game
+        hint: Look for a "Play" or "Start Game" button; play through a complete round
+        finalScreenAssertion: A game results screen appears showing scores and a completion confirmation
+      - goal: Tap the button to save the game result
+        hint: Look for "Save", "Submit", or "Continue" on the results screen
+        finalScreenAssertion: The app confirms the game was saved and returns to the main menu
 
   - displayName: Loaded state after login
     id: sync_001
+    prerequisiteTestCaseId: auth_001
     steps:
-      - goal: Sign in and wait for cloud data to sync into the local app state.
-        finalScreenAssertion: The settings and stats are loaded correctly from Firebase and the app is ready to use.
+      - goal: Sign in and wait for data to load
+        hint: After login, observe the loading indicator; wait for it to disappear
+        finalScreenAssertion: User profile, stats, and game history appear on the home screen without errors
 
   - displayName: User can read own data
     id: security_001
+    prerequisiteTestCaseId: auth_001
     steps:
-      - goal: Open the private settings for the current user and then try to access another user's private settings.
-        finalScreenAssertion: The app allows access to the user's own data and blocks access to another user's private data.
+      - goal: Open the profile screen and view personal settings
+        hint: Look for a profile icon or "Profile" button
+        finalScreenAssertion: Personal settings are displayed and accessible without errors
 
   - displayName: Network failure fallback
     id: error_001
     steps:
-      - goal: Simulate a network failure while signing in and continue using the app.
-        finalScreenAssertion: The app handles the error gracefully without crashing and shows a safe fallback state.
+      - goal: Disconnect the device from internet and try to sign in
+        hint: Disable WiFi and mobile data before tapping the login button
+        finalScreenAssertion: The app shows an error message (e.g., "Network unavailable") but does not crash and the user can retry
+
+  - displayName: App stability under stress
+    id: stress_001
+    prerequisiteTestCaseId: auth_001
+    steps:
+      - goal: Rapidly tap buttons to switch between screens and menus
+        hint: Open Settings, close it, open Games, close it, repeat 5 times quickly
+        finalScreenAssertion: The app remains responsive and does not crash or show black screens
