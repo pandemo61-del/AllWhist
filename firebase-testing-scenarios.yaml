@@ -1,94 +1,42 @@
-version: 1
-name: AllWhist Firebase scenario suite
-scenarios:
-  - id: auth_001
-    name: Anonymous login
-    description: "Authenticate as an anonymous user and verify the session is active."
+tests:
+  - displayName: Anonymous login
+    id: auth_001
     steps:
-      - type: auth
-        action: signInAnonymously
-      - type: assert
-        condition: "user != null"
-        message: "Anonymous user must be created successfully."
+      - goal: Launch the app and sign in anonymously.
+        finalScreenAssertion: The user is authenticated and the session is active.
 
-  - id: auth_002
-    name: Google login
-    description: "Authenticate with Google and verify the Firebase user is valid."
+  - displayName: Google login
+    id: auth_002
     steps:
-      - type: auth
-        action: signInWithPopup
-        provider: Google
-      - type: assert
-        condition: "user.email != null"
-        message: "Google-authenticated user must have an email."
+      - goal: Sign in with Google using the authentication flow.
+        finalScreenAssertion: The user is successfully authenticated and has a valid email address.
 
-  - id: firestore_001
-    name: Save user settings
-    description: "Persist user preferences into Firestore."
+  - displayName: Save user settings
+    id: firestore_001
     steps:
-      - type: firestore
-        collection: users/{uid}/private/settings
-        operation: set
-        payload:
-          langue: fr
-          autoJeu: false
-          vibration: true
-          son: true
-      - type: assert
-        condition: "writeSucceeded == true"
-        message: "The settings document should be saved."
+      - goal: Open the settings screen and save the user preferences in French with notifications enabled.
+        finalScreenAssertion: The preferences are persisted successfully and the app confirms the save.
 
-  - id: firestore_002
-    name: Save completed game
-    description: "Persist a finished game result in the games collection."
+  - displayName: Save completed game
+    id: firestore_002
     steps:
-      - type: firestore
-        collection: games
-        operation: add
-        payload:
-          userId: "uid-test-001"
-          varianteId: classic
-          manche: 1
-          scores: [0, 0, 0, 0]
-          timestamp: "2026-10-09T00:00:00.000Z"
-      - type: assert
-        condition: "documentId != null"
-        message: "Game record should be created with an ID."
+      - goal: Complete a game and save the result to the games collection.
+        finalScreenAssertion: The game result is stored successfully and the app confirms the creation of the record.
 
-  - id: sync_001
-    name: Loaded state after login
-    description: "Verify that settings and stats are loaded after authentication."
+  - displayName: Loaded state after login
+    id: sync_001
     steps:
-      - type: state
-        action: initializeSync
-      - type: assert
-        condition: "settingsLoaded == true && statsLoaded == true"
-        message: "Cloud data should be loaded into local store."
+      - goal: Sign in and wait for cloud data to sync into the local app state.
+        finalScreenAssertion: The settings and stats are loaded correctly from Firebase and the app is ready to use.
 
-  - id: security_001
-    name: User can read own data
-    description: "Verify user A cannot read user B private data."
+  - displayName: User can read own data
+    id: security_001
     steps:
-      - type: firestore
-        collection: users/userA/private/settings
-        operation: read
-      - type: assert
-        condition: "readAllowed == true"
-        message: "User can read own data."
-      - type: firestore
-        collection: users/userB/private/settings
-        operation: read
-      - type: assert
-        condition: "readAllowed == false"
-        message: "User cannot read another user's private data."
+      - goal: Open the private settings for the current user and then try to access another user's private settings.
+        finalScreenAssertion: The app allows access to the user's own data and blocks access to another user's private data.
 
-  - id: error_001
-    name: Network failure fallback
-    description: "When Firebase is unavailable, the app should fail gracefully."
+  - displayName: Network failure fallback
+    id: error_001
     steps:
-      - type: auth
-        action: signInAnonymously
-        simulateFailure: network-error
-      - type: assert
-        condition: "result == null || error.code == 'auth/network-request-failed'"
-        message: "The app should handle network errors without crashing."
+      - goal: Simulate a network failure while signing in and continue using the app.
+        finalScreenAssertion: The app handles the error gracefully without crashing and shows a safe fallback state.
