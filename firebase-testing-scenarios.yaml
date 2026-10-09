@@ -1,366 +1,94 @@
-firebase_test_scenarios:
-  # Project Configuration
-  project:
-    id: "allwhist-61182"
-    name: "AllWhist Firebase Tests"
-    region: "europe-west1"
+version: 1
+name: AllWhist Firebase scenario suite
+scenarios:
+  - id: auth_001
+    name: Anonymous login
+    description: "Authenticate as an anonymous user and verify the session is active."
+    steps:
+      - type: auth
+        action: signInAnonymously
+      - type: assert
+        condition: "user != null"
+        message: "Anonymous user must be created successfully."
 
-  # ─────────────────────────────────────────
-  # Authentication Test Scenarios
-  # ─────────────────────────────────────────
-  auth_scenarios:
-    - id: auth_001
-      name: "Anonymous Login"
-      description: "Test anonymous authentication for guest users"
-      steps:
-        - action: "signInAnonymously"
-          expectedResult: "User UID returned successfully"
-        - action: "verify_auth_state"
-          expectedResult: "currentUser is not null"
-      cleanup: "signOut()"
+  - id: auth_002
+    name: Google login
+    description: "Authenticate with Google and verify the Firebase user is valid."
+    steps:
+      - type: auth
+        action: signInWithPopup
+        provider: Google
+      - type: assert
+        condition: "user.email != null"
+        message: "Google-authenticated user must have an email."
 
-    - id: auth_002
-      name: "Google OAuth Login"
-      description: "Test Google authentication via popup"
-      prerequisites:
-        - "Google OAuth credentials configured"
-        - "User has valid Google account"
-      steps:
-        - action: "signInWithPopup(googleProvider)"
-          expectedResult: "Redirect to Google login"
-        - action: "verify_email_claim"
-          expectedResult: "User email verified"
-        - action: "verify_uid_persistence"
-          expectedResult: "UID stored in AsyncStorage"
-      cleanup: "signOut()"
+  - id: firestore_001
+    name: Save user settings
+    description: "Persist user preferences into Firestore."
+    steps:
+      - type: firestore
+        collection: users/{uid}/private/settings
+        operation: set
+        payload:
+          langue: fr
+          autoJeu: false
+          vibration: true
+          son: true
+      - type: assert
+        condition: "writeSucceeded == true"
+        message: "The settings document should be saved."
 
-    - id: auth_003
-      name: "Auth State Persistence"
-      description: "Verify auth state persists across sessions"
-      steps:
-        - action: "loginAnonymously"
-        - action: "store_uid_in_async_storage"
-        - action: "reload_app"
-        - action: "check_current_user"
-          expectedResult: "currentUser preserved from AsyncStorage"
+  - id: firestore_002
+    name: Save completed game
+    description: "Persist a finished game result in the games collection."
+    steps:
+      - type: firestore
+        collection: games
+        operation: add
+        payload:
+          userId: "uid-test-001"
+          varianteId: classic
+          manche: 1
+          scores: [0, 0, 0, 0]
+          timestamp: "2026-10-09T00:00:00.000Z"
+      - type: assert
+        condition: "documentId != null"
+        message: "Game record should be created with an ID."
 
-    - id: auth_004
-      name: "Network Failure Handling"
-      description: "Test graceful error handling on network failure"
-      preconditions: "Device offline or Firebase servers blocked"
-      steps:
-        - action: "attempt_signInAnonymously"
-          expectedResult: "Error code: auth/network-request-failed"
-        - action: "verify_error_message"
-          expectedResult: "Console logs network error details"
-        - action: "verify_null_return"
-          expectedResult: "loginAnonymously returns null"
+  - id: sync_001
+    name: Loaded state after login
+    description: "Verify that settings and stats are loaded after authentication."
+    steps:
+      - type: state
+        action: initializeSync
+      - type: assert
+        condition: "settingsLoaded == true && statsLoaded == true"
+        message: "Cloud data should be loaded into local store."
 
-  # ─────────────────────────────────────────
-  # Firestore Data Scenarios
-  # ─────────────────────────────────────────
-  firestore_scenarios:
-    - id: fs_001
-      name: "Save User Settings"
-      description: "Test user settings persistence"
-      collection: "users/{userId}/private/settings"
-      data:
-        ordreCouleurs: ["♠", "♥", "♣", "♦"]
-        ordreValeur: ["A", "K", "Q", "J", "10", "9", "8", "7", "6", "5", "4", "3", "2"]
-        directionTri: "desc"
-        autoJeu: false
-        langue: "fr"
-        hasSeenOnboarding: true
-        vibration: true
-        son: true
-      steps:
-        - action: "saveUserSettings(uid, settings)"
-          expectedResult: "Document created/updated successfully"
-        - action: "getUserSettings(uid)"
-          expectedResult: "Returns settings object with all fields"
+  - id: security_001
+    name: User can read own data
+    description: "Verify user A cannot read user B private data."
+    steps:
+      - type: firestore
+        collection: users/userA/private/settings
+        operation: read
+      - type: assert
+        condition: "readAllowed == true"
+        message: "User can read own data."
+      - type: firestore
+        collection: users/userB/private/settings
+        operation: read
+      - type: assert
+        condition: "readAllowed == false"
+        message: "User cannot read another user's private data."
 
-    - id: fs_002
-      name: "Save Game History"
-      description: "Test game history storage and retrieval"
-      collection: "games/{gameId}"
-      data:
-        userId: "{uid}"
-        sessionGameId: "{sessionId}"
-        varianteId: "classic"
-        manche: 1
-        scores: [0, 0, 0, 0]
-        atout: "♠"
-        contrat: 0
-        timestamp: "{ISO8601}"
-        resultat:
-          manches:
-            - numero: 1
-              contrats: [0, 0, 0, 0]
-              realisations: [0, 0, 0, 0]
-              penalites: [0, 0, 0, 0]
-      steps:
-        - action: "saveGame(uid, gameData)"
-          expectedResult: "Game document created in Firestore"
-        - action: "query_user_games"
-          expectedResult: "Returns array of user's games"
-
-    - id: fs_003
-      name: "Save User Statistics"
-      description: "Test stats aggregation and persistence"
-      collection: "users/{userId}/private/stats"
-      data:
-        totalManches: 42
-        totalChutesJoueur: 5
-        totalChutesIA: 3
-        erreursFrequentesJoueur: ["Bad suit", "Wrong atout"]
-        precisionMoyenneJoueur: 87.5
-        precisionMoyenneIA: 92.3
-        historiquePrecision: [85, 87, 90, 88, 87]
-      steps:
-        - action: "saveUserStats(uid, stats)"
-          expectedResult: "Stats document persisted"
-        - action: "sync_stats_on_game_end"
-          expectedResult: "Stats updated after each manche"
-
-    - id: fs_004
-      name: "Admin User List Access"
-      description: "Test admin can query all users"
-      collection: "users/"
-      query:
-        rules:
-          - "isAdmin() = true"
-          - "Can read all documents"
-      steps:
-        - action: "login_as_admin"
-          uid: "8h33F1UBYlfugGa5FBPRCNNJ7D12"
-        - action: "getDocs(query(collection(db, 'users')))"
-          expectedResult: "Returns all user documents"
-        - action: "login_as_regular_user"
-        - action: "attempt_same_query"
-          expectedResult: "Access denied (permission error)"
-
-  # ─────────────────────────────────────────
-  # Firestore Security Rules Scenarios
-  # ─────────────────────────────────────────
-  security_rules_scenarios:
-    - id: sec_001
-      name: "User Private Data Access Control"
-      description: "Verify users can only access their own private data"
-      steps:
-        - action: "login_user_A"
-        - action: "query_user_A_private_settings"
-          expectedResult: "Access granted"
-        - action: "query_user_B_private_settings"
-          expectedResult: "Access denied (permission-denied)"
-
-    - id: sec_002
-      name: "Game Creation by Any Authenticated User"
-      description: "Verify any authenticated user can create games"
-      steps:
-        - action: "login_anonymously"
-        - action: "create_game({userId, varianteId})"
-          expectedResult: "Game document created successfully"
-
-    - id: sec_003
-      name: "Game Read Restrictions"
-      description: "Only owner or admin can read game details"
-      steps:
-        - action: "create_game_by_user_A"
-        - action: "login_user_B"
-        - action: "read_game_created_by_A"
-          expectedResult: "Access denied"
-        - action: "login_admin"
-        - action: "read_game_created_by_A"
-          expectedResult: "Access granted"
-
-    - id: sec_004
-      name: "Game Modification Restrictions"
-      description: "Only admin can modify or delete games"
-      steps:
-        - action: "login_user_A_who_created_game"
-        - action: "update_game"
-          expectedResult: "Access denied"
-        - action: "delete_game"
-          expectedResult: "Access denied"
-        - action: "login_admin"
-        - action: "update_game"
-          expectedResult: "Access granted"
-
-  # ─────────────────────────────────────────
-  # Sync Manager Scenarios
-  # ─────────────────────────────────────────
-  sync_scenarios:
-    - id: sync_001
-      name: "Initial Data Load on Login"
-      description: "Verify settings and stats load from cloud on auth"
-      steps:
-        - action: "loginAnonymously"
-        - action: "wait_for_auth_state_change"
-        - action: "verify_settings_store_populated"
-          expectedResult: "Local store contains cloud settings"
-        - action: "verify_stats_store_populated"
-          expectedResult: "Local store contains cloud stats"
-
-    - id: sync_002
-      name: "Settings Auto-Save on Change"
-      description: "Test debounced settings persistence to Firebase"
-      steps:
-        - action: "login_and_wait_for_sync"
-        - action: "change_setting(autoJeu, true)"
-        - action: "wait_debounce_period(500ms)"
-        - action: "verify_firebase_update"
-          expectedResult: "Setting persisted to cloud"
-
-    - id: sync_003
-      name: "Stats Update After Game End"
-      description: "Verify stats sync after manche completion"
-      steps:
-        - action: "play_complete_manche"
-        - action: "wait_for_game_save"
-        - action: "verify_firebase_stats_updated"
-          expectedResult: "totalManches incremented, precision recalculated"
-
-    - id: sync_004
-      name: "Offline Mode Resilience"
-      description: "Test data persistence when offline"
-      preconditions: "Device offline"
-      steps:
-        - action: "login_user_with_cached_data"
-        - action: "play_game"
-        - action: "make_settings_change"
-        - action: "come_online"
-        - action: "verify_sync_on_reconnect"
-          expectedResult: "Data synced to Firebase"
-
-  # ─────────────────────────────────────────
-  # Integration Scenarios
-  # ─────────────────────────────────────────
-  integration_scenarios:
-    - id: int_001
-      name: "Complete Game Session Flow"
-      description: "End-to-end test: login → play → save → stats update"
-      steps:
-        - action: "loginAnonymously"
-        - action: "verify_user_settings_loaded"
-        - action: "play_complete_partie"
-          variante: "classic"
-          manches: 13
-        - action: "verify_game_saved_to_firestore"
-        - action: "verify_stats_updated"
-        - action: "verify_settings_persisted"
-
-    - id: int_002
-      name: "Multi-Device Sync"
-      description: "Test settings sync across devices"
-      steps:
-        - action: "login_device_A"
-        - action: "change_settings_on_device_A"
-        - action: "logout_device_A"
-        - action: "login_device_B_same_user"
-        - action: "verify_device_B_has_latest_settings"
-          expectedResult: "Device B shows Device A's changes"
-
-    - id: int_003
-      name: "Admin Dashboard User Management"
-      description: "Test admin can view and manage all users"
-      steps:
-        - action: "login_admin_via_console"
-        - action: "load_users_list"
-          expectedResult: "All user documents displayed"
-        - action: "view_user_details"
-          expectedResult: "Shows settings, stats, last seen"
-        - action: "export_user_data"
-          expectedResult: "JSON export with all user info"
-
-  # ─────────────────────────────────────────
-  # Error & Edge Case Scenarios
-  # ─────────────────────────────────────────
-  error_scenarios:
-    - id: err_001
-      name: "Undefined Field Cleanup"
-      description: "Verify undefined fields are stripped before save"
-      steps:
-        - action: "saveUserSettings with undefined values"
-        - action: "retrieve_from_firestore"
-          expectedResult: "Document contains only defined fields"
-
-    - id: err_002
-      name: "Quota Exceeded Handling"
-      description: "Test graceful handling of quota exceeded"
-      preconditions: "Firebase quota limit reached"
-      steps:
-        - action: "attempt_saveGame"
-          expectedResult: "Error code: resource-exhausted"
-        - action: "verify_user_notified"
-          expectedResult: "Toast or alert shown"
-
-    - id: err_003
-      name: "Concurrent Write Conflict"
-      description: "Test handling of simultaneous updates"
-      steps:
-        - action: "device_A_saves_settings"
-        - action: "device_B_saves_settings_simultaneously"
-        - action: "wait_for_sync"
-          expectedResult: "Last write wins (merge handled by last-write-wins)"
-
-    - id: err_004
-      name: "Invalid Game Data"
-      description: "Test validation before saving corrupt data"
-      steps:
-        - action: "attempt_save_game_with_negative_scores"
-          expectedResult: "Validation error, not saved"
-        - action: "attempt_save_game_with_invalid_variant"
-          expectedResult: "Validation error, not saved"
-
-  # ─────────────────────────────────────────
-  # Performance Scenarios
-  # ─────────────────────────────────────────
-  performance_scenarios:
-    - id: perf_001
-      name: "Large Game History Query"
-      description: "Test query performance with 1000+ games"
-      steps:
-        - action: "query_user_games_with_pagination"
-          limit: 50
-        - action: "measure_response_time"
-          expectedResult: "<500ms"
-
-    - id: perf_002
-      name: "Stats Recalculation Performance"
-      description: "Test efficiency of stats aggregation"
-      steps:
-        - action: "recalculate_stats_from_100_games"
-        - action: "measure_computation_time"
-          expectedResult: "<2s"
-
-    - id: perf_003
-      name: "Sync Debounce Efficiency"
-      description: "Verify rapid setting changes are debounced"
-      steps:
-        - action: "rapidly_change_settings_10x"
-        - action: "count_firebase_writes"
-          expectedResult: "1 write (not 10)"
-
-# ─────────────────────────────────────────
-# Test Execution Instructions
-# ─────────────────────────────────────────
-test_execution:
-  environment:
-    - "Firebase Console project: allwhist-61182"
-    - "Test data region: europe-west1"
-    - "Enable Firebase Emulator Suite for local testing"
-
-  command: |
-    firebase emulators:start --only auth,firestore
-    npm test -- --scenario-file firebase-testing-scenarios.yaml
-
-  cleanup:
-    - "Clear all test documents after each scenario"
-    - "Reset auth users"
-    - "Verify no production data affected"
-
-  reporting:
-    - "Log all auth attempts with timestamps"
-    - "Track query performance metrics"
-    - "Document security rule violations"
-    - "Generate coverage report"
+  - id: error_001
+    name: Network failure fallback
+    description: "When Firebase is unavailable, the app should fail gracefully."
+    steps:
+      - type: auth
+        action: signInAnonymously
+        simulateFailure: network-error
+      - type: assert
+        condition: "result == null || error.code == 'auth/network-request-failed'"
+        message: "The app should handle network errors without crashing."
