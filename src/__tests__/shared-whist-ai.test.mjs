@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { chooseMisereDiscard, chooseWhistBid, chooseWhistCard } from '../../shared/whist-ai.js';
+import { getWhistContractName } from '../../shared/whist-contracts.js';
 
 const card = (value, suit) => ({
   id: `${value}_${suit}`,
@@ -36,6 +37,13 @@ const contracts = [
       ? hand.filter(candidate => candidate.valeur === 14).length === 4
       : true,
 }));
+
+test('affiche le libellé des anciens contrats sans nom enregistré', () => {
+  assert.equal(getWhistContractName({ id: 'trou' }), 'Trou');
+  assert.equal(getWhistContractName({ id: 'trou_royal', nom: 'Nom personnalisé' }), 'Nom personnalisé');
+  assert.equal(getWhistContractName({ id: 'contrat_inconnu' }), 'contrat_inconnu');
+  assert.equal(getWhistContractName({ id: 'toString' }), 'toString');
+});
 
 test('annonce le Trou avec la couleur de l’As appelé', () => {
   const hand = [
