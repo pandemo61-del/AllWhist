@@ -40,6 +40,8 @@ export const GameTable: React.FC<any> = ({
 
   const getPlis = (id: number) => plisTermines.filter((p: Pli) => p.gagnantId === id).length;
   const currentVariante = getVariante(varianteId);
+  const contratAtout = contrat?.atout ?? atout;
+  const estContratTrou = contrat?.id === 'trou' || contrat?.id === 'trou_royal';
 
   const getEq = (id: number) => {
     if (currentVariante?.equipeFixe) return (id % 2 === 0) ? 'A' : 'B';
@@ -80,7 +82,11 @@ export const GameTable: React.FC<any> = ({
           )}
           {contrat && (
             <View style={[styles.badge, styles.bContrat]}>
-              <Text style={styles.bTxtW}>{contrat.nom}: {nbPlisEq}/{contrat.plisObjectif}</Text>
+              <Text style={styles.bTxtW}>
+                {contrat.nom}
+                {estContratTrou && contratAtout ? ` — Atout ${SYMBOLE[contratAtout]}` : ''}
+                : {nbPlisEq}/{contrat.plisObjectif}
+              </Text>
             </View>
           )}
           <View style={styles.badge}><Text style={styles.bTxt}>Pli {plisTermines.length + 1}/13</Text></View>
