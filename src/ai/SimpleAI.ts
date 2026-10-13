@@ -2,16 +2,20 @@
 //  IA — 3 NIVEAUX + ENCHÈRES
 // ─────────────────────────────────────────────
 
-import { Carte, Couleur, Pli, ContratJoue, Joueur } from '../engine/types';
+import { Carte, Couleur, Pli, ContratJoue, Joueur, Valeur } from '../engine/types';
 import { cartesJouables, estPlusForte, determinerGagnant, determinerCouleursEpuiseesMisere } from '../engine/rules';
-import {
-  evaluerForceMain,
-  couleurLaPlusLongue,
-  cartesParCouleur,
-} from '../engine/deck';
+import { chooseWhistBid, chooseWhistCard } from '../../shared/whist-ai';
 import { VariantConfig, ContratConfig } from '../variants/types';
 
 export type NiveauIA = 'facile' | 'moyen' | 'expert';
+
+function estContratWhistGand(contratId: string): boolean {
+  return [
+    'propose', 'emballe', 'demande', 'trou', 'trou_royal', 'solo_6', 'solo_7',
+    'solo_8', 'abondance_9', 'abondance_10', 'abondance_11', 'abondance_12',
+    'misere', 'petite_misere', 'misere_ouverte', 'chelem',
+  ].includes(contratId);
+}
 
 // ──────────────────────────────────────────────
 //  CHOIX DE CARTE
@@ -29,6 +33,19 @@ export function choisirCarte(
   niveau: NiveauIA,
   plisTermines: Pli[] = [],
 ): Carte {
+  if (niveau === 'expert' && contrat && estContratWhistGand(contrat.id)) {
+    const carte = chooseWhistCard(
+      joueur.main,
+      joueur.id,
+      pli,
+      atout,
+      contrat,
+      cartesDejaJouees,
+      plisTermines,
+    );
+    if (carte) return carte;
+  }
+
   const jouables = cartesJouables(joueur.main, pli, atout ?? undefined);
 
   if (jouables.length === 0) {
@@ -381,39 +398,15 @@ export function choisirEnchere(
   variante: VariantConfig,
   meilleureEnchere: ContratJoue | null,
   niveau: NiveauIA,
-  joueurId: number,
+  joueurId = 0,
   preferenceCouleurs?: Couleur[],
 ): DecisionEnchere {
+  if (variante.id === 'whist-gand') {
+    return chooseWhistBid(main, meilleureEnchere, niveau, joueurId, variante.contrats);
+  }
+
   const { force, meilleureCol, nbAtouts } = evaluerForceAvancee(main);
   const currentPriorite = meilleureEnchere?.priorite ?? -1;
-
-  if (variante.id === 'whist-gand') {
-    const nbAs = main.filter(c => c.valeur === 14).length;
-
-    // "Trou" (9 plis avec partenaire imposé par le 4ème As)
-    if (nbAs === 3 && currentPriorite < 7) {
-      const asPossedes = main.filter(c => c.valeur === 14).map(c => c.couleur);
-      const asManquant = [Couleur.COEUR, Couleur.CARREAU, Couleur.TREFLE, Couleur.PIQUE]
-        .find(col => !asPossedes.includes(col));
-
-      return {
-        action: 'enchere',
-        contratId: 'trou',
-        atout: asManquant,
-        asPartenaire: asManquant ? `14_${asManquant}` : undefined,
-      };
-    }
-
-    // "Trou Royal" (4 As en main, appelle le Roi de Cœur)
-    if (nbAs === 4 && currentPriorite < 7.5) {
-      return {
-        action: 'enchere',
-        contratId: 'trou_royal',
-        atout: Couleur.COEUR,
-        asPartenaire: `13_${Couleur.COEUR}`,
-      };
-    }
-  }
 
   const seuils = {
     facile:  { propose: 18, solo: 28, abondance: 38, misere: 2 },

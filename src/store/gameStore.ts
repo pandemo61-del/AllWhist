@@ -22,6 +22,7 @@ import {
 import { calculerScoreGenerique, construireScoreManche } from '../engine/scoring';
 import { getVariante, getContrat, VariantConfig } from '../variants/index';
 import { choisirCarte, choisirEnchere, NiveauIA } from '../ai/SimpleAI';
+import { chooseMisereDiscard, WHIST_AI_VERSION } from '../../shared/whist-ai';
 import { analyserPli } from '../engine/analysis';
 import { useStatsStore } from './statsStore';
 import { translations } from '../i18n/translations';
@@ -318,6 +319,12 @@ export const useGameStore = create<GameStore>()(
   passerEnchere() {
     const state = get();
     const { etatEnchere, joueurs } = state;
+    const historique = etatEnchere.historique;
+    const propositionSansEmballage = etatEnchere.meilleureEnchere?.id === 'propose' &&
+      !historique.some(h => h.action === 'enchere' && h.contrat?.id === 'emballe');
+    const proposantId = [...historique].reverse().find(h => h.contrat?.id === 'propose')?.joueurId;
+    const proposantRefuse = propositionSansEmballage &&
+      proposantId === etatEnchere.joueurCourantId;
 
     let partenaireRévélé = state.partenaireRévélé;
     let contratEnCours = state.contratEnCours;
@@ -339,7 +346,8 @@ export const useGameStore = create<GameStore>()(
 
     const nouvelEtat: EtatEnchere = {
       ...state.etatEnchere,
-      passesConsecutifs: state.etatEnchere.passesConsecutifs + 1,
+      meilleureEnchere: proposantRefuse ? null : state.etatEnchere.meilleureEnchere,
+      passesConsecutifs: proposantRefuse ? 1 : state.etatEnchere.passesConsecutifs + 1,
       historique: [
         ...state.etatEnchere.historique,
         { joueurId: state.etatEnchere.joueurCourantId, action: 'passe' },
@@ -416,6 +424,8 @@ export const useGameStore = create<GameStore>()(
           saveGame(user.uid, {
             sessionGameId: state.sessionGameId,
             varianteId: state.varianteId,
+            sourcePlatform: 'app',
+            aiVersion: WHIST_AI_VERSION,
             manche: state.manche,
             scores: nouveauxScores,
             atout: state.atout,
@@ -735,7 +745,9 @@ export const useGameStore = create<GameStore>()(
       // Sécurité Whist de Gand : une Proposition seule ne peut pas lancer le jeu
       if (contratFinal?.id === 'propose' && !state.etatEnchere.historique.some(h => h.action === 'enchere' && h.contrat?.id === 'emballe')) {
         // On rend la main au proposant pour qu'il change son fusil d'épaule ou passe
-        const proposantId = state.etatEnchere.historique.find(h => h.contrat?.id === 'propose')?.joueurId ?? state.donneur;
+        const proposantId = [...state.etatEnchere.historique]
+          .reverse()
+          .find(h => h.contrat?.id === 'propose')?.joueurId ?? state.donneur;
         set({
           etatEnchere: {
             ...state.etatEnchere,
@@ -840,6 +852,7 @@ export const useGameStore = create<GameStore>()(
       state.contratEnCours,
       cartesJouees,
       niveau,
+      state.plisTermines,
     );
 
     get()._poserCarte(carte, state.tourDeJoueur);
@@ -849,10 +862,10 @@ export const useGameStore = create<GameStore>()(
     const state = get();
     const nouveauxJoueurs = state.joueurs.map(j => {
       if (j.type === 'humain') return j;
-      // L'IA écarte sa carte la plus "dangereuse" ou la plus forte
-      // En Petite Misère, elle veut écarter une grosse carte isolée
-      const mainTriee = [...j.main].sort((a, b) => b.valeur - a.valeur);
-      return { ...j, main: j.main.filter(c => c.id !== mainTriee[0].id) };
+      const carteEcartee = chooseMisereDiscard(j.main);
+      return carteEcartee
+        ? { ...j, main: j.main.filter(c => c.id !== carteEcartee.id) }
+        : j;
     });
 
     set({ joueurs: nouveauxJoueurs });

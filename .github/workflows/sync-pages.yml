@@ -7,6 +7,7 @@ on:
     paths:
       - 'admin/**'
       - 'web/**'
+      - 'shared/**'
   workflow_dispatch:
 
 jobs:
@@ -22,6 +23,7 @@ jobs:
           echo "========================================="
           echo "Source Admin : AllWhist/admin"
           echo "Source Web   : AllWhist/web"
+          echo "Shared AI    : AllWhist/shared"
           echo "Destination  : pandemo61-del.github.io/allwhist"
           echo "Commit       : ${{ github.sha }}"
           echo "Actor        : ${{ github.actor }}"
@@ -47,10 +49,21 @@ jobs:
           target-folder: allwhist/web
           clean: false
 
+      - name: Deploy shared AI to allwhist/shared
+        uses: JamesIves/github-pages-deploy-action@v4
+        with:
+          token: ${{ secrets.PAGES_TOKEN }}
+          repository-name: pandemo61-del/pandemo61-del.github.io
+          branch: main
+          folder: shared
+          target-folder: allwhist/shared
+          clean: false
+
       - name: Deployment summary
         run: |
           echo "========================================="
           echo "✅ Sync completed"
           echo "🌐 Admin : https://pandemo61-del.github.io/allwhist/admin/"
           echo "🌐 Web   : https://pandemo61-del.github.io/allwhist/web/"
+          echo "🤖 IA    : https://pandemo61-del.github.io/allwhist/shared/"
           echo "========================================="

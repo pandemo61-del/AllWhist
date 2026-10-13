@@ -5,6 +5,7 @@ import { evaluerReussite, calculerScoreGenerique } from '../engine/scoring';
 import { WhistGand } from '../variants/whistGand';
 import { getContrat } from '../variants/index';
 import { Couleur, ContratJoue, Pli, Joueur, Carte } from '../engine/types';
+import { chooseMisereDiscard } from '../../shared/whist-ai';
 
 jest.setTimeout(120000); // 2 minutes pour 200 parties
 
@@ -40,7 +41,7 @@ describe('Simulation intensive - 200 parties de Whist de Gand', () => {
 
       while (passesConsecutifs < 4) {
         const id = tour % 4;
-        const decision: DecisionEnchere = choisirEnchere(joueurs[id].main, WhistGand, meilleureEnchere, 'expert');
+        const decision: DecisionEnchere = choisirEnchere(joueurs[id].main, WhistGand, meilleureEnchere, 'expert', id);
 
         if (decision.action === 'passe') {
           passesConsecutifs++;
@@ -51,8 +52,8 @@ describe('Simulation intensive - 200 parties de Whist de Gand', () => {
           // Gérer l'écart pour la petite misère au sein de la simulation intensive
           if (decision.contratId === 'petite_misere') {
             joueurs.forEach(j => {
-              j.main.sort((a,b) => b.valeur - a.valeur);
-              j.main.shift(); // Écarte la carte la plus forte de chaque joueur
+              const carteEcartee = chooseMisereDiscard(j.main);
+              if (carteEcartee) j.main = j.main.filter(c => c.id !== carteEcartee.id);
             });
           }
 
@@ -101,7 +102,7 @@ describe('Simulation intensive - 200 parties de Whist de Gand', () => {
           const j = joueurs[jId];
           const cartesDejaJouees = plisTermines.flatMap(pt => pt.cartesJouees.map(c => c.carte));
 
-          const carte = choisirCarte(j, pli, atout, meilleureEnchere, cartesDejaJouees, 'expert');
+          const carte = choisirCarte(j, pli, atout, meilleureEnchere, cartesDejaJouees, 'expert', plisTermines);
 
           // Révélation partenaire
           if (meilleureEnchere && estRevélationPartenaire(carte, meilleureEnchere)) {

@@ -105,18 +105,18 @@ export function misereEchouee(
   return plisTermines.some(p => p.gagnantId === joueurId);
 }
 
-// ─── Révélation du partenaire (Demande Gand) ───
+// ─── Révélation du partenaire (Whist de Gand) ───
 
 /**
  * Vérifie si la carte jouée révèle le partenaire secret.
- * Le partenaire est le joueur qui possède/joue l'As demandé.
+ * Le partenaire est le joueur qui joue la carte appelée.
  */
 export function estRevélationPartenaire(
   carte: Carte,
   contrat: ContratJoue,
 ): boolean {
   return (
-    (contrat.id === 'demande' || contrat.id === 'trou') &&
+    (contrat.id === 'demande' || contrat.id === 'trou' || contrat.id === 'trou_royal') &&
     contrat.asPartenaire !== undefined &&
     carte.id === contrat.asPartenaire.id
   );
@@ -174,4 +174,3 @@ export function determinerCouleursEpuiseesMisere(
 
   return epuisees;
 }
-
