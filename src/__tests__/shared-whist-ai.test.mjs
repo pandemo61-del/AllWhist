@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { chooseMisereDiscard, chooseWhistBid, chooseWhistCard } from '../../shared/whist-ai.js';
+import { chooseMisereDiscard, chooseWhistBid, chooseWhistCard, WHIST_AI_VERSION } from '../../shared/whist-ai.js';
 import { getWhistContractName } from '../../shared/whist-contracts.js';
 
 const card = (value, suit) => ({
@@ -38,6 +38,10 @@ const contracts = [
       : true,
 }));
 
+test('versionne les nouvelles décisions partagées', () => {
+  assert.equal(WHIST_AI_VERSION, '1.1.0');
+});
+
 test('affiche le libellé des anciens contrats sans nom enregistré', () => {
   assert.equal(getWhistContractName({ id: 'trou' }), 'Trou');
   assert.equal(getWhistContractName({ id: 'trou_royal', nom: 'Nom personnalisé' }), 'Nom personnalisé');
@@ -59,6 +63,35 @@ test('annonce le Trou avec la couleur de l’As appelé', () => {
   assert.equal(bid.asPartenaire, '14_PIQUE');
 });
 
+test('l’annonceur du Trou entame dans la couleur appelée pour établir le partenaire', () => {
+  const hand = [card(14, 'COEUR'), card(13, 'TREFLE'), card(2, 'PIQUE')];
+  const chosen = chooseWhistCard(
+    hand,
+    0,
+    { numero: 1, cartesJouees: [] },
+    'PIQUE',
+    { id: 'trou', joueurId: 0, atout: 'PIQUE', asPartenaire: '14_PIQUE' },
+  );
+  assert.equal(chosen.couleur, 'PIQUE');
+});
+
+test('le partenaire du Trou joue l’As appelé pour protéger le pli des adversaires suivants', () => {
+  const hand = [card(14, 'PIQUE'), card(2, 'PIQUE')];
+  const trick = {
+    numero: 1,
+    couleurDemandee: 'PIQUE',
+    cartesJouees: [{ joueurId: 0, carte: card(10, 'PIQUE') }],
+  };
+  const chosen = chooseWhistCard(
+    hand,
+    1,
+    trick,
+    'PIQUE',
+    { id: 'trou', joueurId: 0, atout: 'PIQUE', asPartenaire: '14_PIQUE' },
+  );
+  assert.equal(chosen.valeur, 14);
+});
+
 test('ne surenchérit pas sur un contrat de priorité supérieure', () => {
   const hand = Array.from({ length: 13 }, (_, index) => card(index + 2, 'COEUR'));
   const bid = chooseWhistBid(hand, { id: 'chelem', priorite: 12 }, 'expert', 0, contracts);
@@ -74,7 +107,7 @@ test('reconnaît une couleur d’atout maîtresse avant un Chelem', () => {
 
 test('emballe une proposition avec une couleur suffisamment longue', () => {
   const hand = [
-    ...[2, 3, 4, 5, 6].map(value => card(value, 'PIQUE')),
+    ...[2, 3, 4, 13, 14].map(value => card(value, 'PIQUE')),
     card(13, 'COEUR'),
     card(13, 'CARREAU'),
     ...[2, 3, 4, 5, 6, 7].map((value, index) => card(value, ['COEUR', 'CARREAU', 'TREFLE'][index % 3])),
@@ -88,6 +121,21 @@ test('emballe une proposition avec une couleur suffisamment longue', () => {
   );
   assert.equal(bid.contratId, 'emballe');
   assert.equal(bid.atout, 'PIQUE');
+});
+
+test('ne s’engage pas dans Emballe avec cinq atouts et un seul honneur', () => {
+  const hand = [
+    ...[2, 3, 4, 5, 13].map(value => card(value, 'PIQUE')),
+    ...[2, 3, 4, 5, 6, 7, 8, 9].map((value, index) => card(value, ['COEUR', 'CARREAU', 'TREFLE'][index % 3])),
+  ];
+  const bid = chooseWhistBid(
+    hand,
+    { id: 'propose', joueurId: 1, priorite: 1, atout: 'PIQUE' },
+    'expert',
+    2,
+    contracts.filter(candidate => ['propose', 'emballe'].includes(candidate.id)),
+  );
+  assert.deepEqual(bid, { action: 'passe' });
 });
 
 test('écarte la carte la plus dangereuse pour une Petite Misère', () => {
@@ -151,7 +199,32 @@ test('le soliste en Misère conserve une carte sûre au lieu de prendre', () => 
     cartesJouees: [{ joueurId: 0, carte: card(5, 'COEUR') }],
   };
   const chosen = chooseWhistCard(hand, 1, trick, null, { id: 'misere', joueurId: 1, seul: true });
-  assert.equal(chosen.valeur, 2);
+  assert.equal(chosen.valeur, 3);
+});
+
+test('le soliste en Misère défausse sa plus forte carte sûre', () => {
+  const hand = [card(2, 'COEUR'), card(10, 'COEUR')];
+  const trick = {
+    numero: 1,
+    couleurDemandee: 'COEUR',
+    cartesJouees: [{ joueurId: 0, carte: card(13, 'COEUR') }],
+  };
+  const chosen = chooseWhistCard(hand, 1, trick, null, { id: 'misere', joueurId: 1, seul: true });
+  assert.equal(chosen.valeur, 10);
+});
+
+test('la défense surcoupe le soliste pour lui faire gagner le moins de plis possible', () => {
+  const hand = [card(11, 'COEUR'), card(4, 'PIQUE')];
+  const trick = {
+    numero: 1,
+    couleurDemandee: 'COEUR',
+    cartesJouees: [
+      { joueurId: 0, carte: card(2, 'COEUR') },
+      { joueurId: 1, carte: card(10, 'COEUR') },
+    ],
+  };
+  const chosen = chooseWhistCard(hand, 2, trick, null, { id: 'misere', joueurId: 1, seul: true });
+  assert.equal(chosen.valeur, 11);
 });
 
 test('la défense évite en entame une couleur dont le soliste a montré la chicane', () => {
