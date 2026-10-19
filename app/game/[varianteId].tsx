@@ -9,6 +9,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
+import { useKeepAwake } from 'expo-keep-awake';
 import { useGameStore } from '../../src/store/gameStore';
 import { useSettingsStore } from '../../src/store/settingsStore';
 import { GameTable }   from '../../src/components/GameTable';
@@ -68,6 +69,7 @@ const timerStyles = StyleSheet.create({
 });
 
 export default function GameScreen() {
+  useKeepAwake(); // Maintient l'écran allumé pendant la partie (mode auto ou normal)
   const { varianteId } = useLocalSearchParams<{ varianteId: string }>();
 
   // Publicité interstitielle de fin de manche
