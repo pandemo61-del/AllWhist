@@ -134,7 +134,7 @@ test('rejoue les mains exactes sans mélanger les données versionnées et histo
   assert.equal(sources.get('legacy@unversioned'), 59);
   assert.deepEqual(outcomes.get('trou'), { deals: 81, successes: 12 });
   assert.deepEqual(outcomes.get('trou_royal'), { deals: 8, successes: 2 });
-  assert.deepEqual(outcomes.get('petite_misere'), { deals: 29, successes: 24 });
+  assert.deepEqual(outcomes.get('petite_misere'), { deals: 29, successes: 27 });
   assert.deepEqual(outcomes.get('misere'), { deals: 10, successes: 9 });
   assert.deepEqual(outcomes.get('emballe'), { deals: 26, successes: 6 });
 });

@@ -39,7 +39,7 @@ const contracts = [
 }));
 
 test('versionne les nouvelles décisions partagées', () => {
-  assert.equal(WHIST_AI_VERSION, '1.1.0');
+  assert.equal(WHIST_AI_VERSION, '1.3.0');
 });
 
 test('affiche le libellé des anciens contrats sans nom enregistré', () => {
