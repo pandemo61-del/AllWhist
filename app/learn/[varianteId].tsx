@@ -337,6 +337,7 @@ function getConseils(id: string) {
 
   const SPECIFIQUES: Record<string, typeof BASE> = {
     'whist-gand': [
+      { icon: '🕳️', titre: '1er tour : Le Trou & Bouche-Trou', desc: 'Le premier tour est réservé aux As. 3 As imposent « Trou » et 4 As imposent « Trou Royal ». Le détenteur du 4ème As ou du Roi de Cœur annonce immédiatement « Bouche-Trou » pour s\'associer.' },
       { icon: '🎯', titre: 'Évaluez avant d\'enchérir', desc: 'Comptez vos As, rois et longueurs d\'atout. Une demande requiert environ 12 points de force (A=3, R=2, D=1.5, V=1).' },
       { icon: '🤫', titre: 'Le partenaire secret', desc: 'Ne révélez pas l\'As partenaire trop tôt si ce n\'est pas nécessaire. Mais jouez-le dès que ça aide votre camp.' },
       { icon: '🎲', titre: 'La misère est risquée', desc: 'Ne la tentez que si vos 13 cartes sont toutes petites. Une seule mauvaise carte peut tout faire rater.' },

@@ -11,11 +11,11 @@ export const WhistGand: VariantConfig = {
     'et le partenaire reste secret jusqu\'à ce qu\'il joue l\'As demandé.',
   regles: [
     'Chaque joueur reçoit 13 cartes. Le donneur tourne à chaque manche.',
-    'Propose / Emballe : un joueur propose une couleur, un autre l\'emballe. Objectif : 8 plis à deux.',
+    '1er tour d\'annonces (Le Trou) : Trou (3 As), Trou Royal (4 As) ou Passe-trou (< 3 As). Lorsqu\'un joueur annonce Trou, le détenteur du 4ème As annonce Bouche-Trou (9 plis à deux).',
+    'Propose / Emballe : si aucun Trou n\'est annoncé, un joueur propose une couleur, un autre l\'emballe. Objectif : 8 plis à deux.',
     'Solo : le joueur joue seul contre les trois autres avec l\'atout de son choix (6, 7 ou 8 plis).',
     'Petite Misère : Zéro pli avec 12 cartes (écarter une carte). Sans atout.',
     'Abondance : 9, 10 ou 11 plis seul. L\'annonceur choisit l\'atout et a souvent l\'entame.',
-    'Le Trou : contrat forcé avec 3 As (9 plis à deux) ou 4 As (Trou Royal).',
     'Grande Misère : Zéro pli avec les 13 cartes. Sans atout.',
     'Misère sur Table : Zéro pli, les cartes sont étalées face visible après le premier pli.',
     'Chelem : Réaliser les 13 plis seul.',
@@ -120,7 +120,7 @@ export const WhistGand: VariantConfig = {
     {
       id: 'trou',
       nom: 'Trou',
-      description: 'Forcé avec 3 As. 9 plis avec le 4ème As.',
+      description: 'Forcé au 1er tour avec 3 As. 9 plis avec le 4ème As (Bouche-Trou).',
       plisMin: 9, plisMax: 13,
       seul: false, partenaire: true,
       pointsReussite: 30, pointsEchec: 30,
@@ -131,7 +131,7 @@ export const WhistGand: VariantConfig = {
     {
       id: 'trou_royal',
       nom: 'Trou Royal',
-      description: 'Forcé avec 4 As. 9 plis avec le Roi de Cœur.',
+      description: 'Forcé au 1er tour avec 4 As. 9 plis avec la plus haute carte de Cœur non possédée (Roi, Dame...). Atout Cœur par défaut.',
       plisMin: 9, plisMax: 13,
       seul: false, partenaire: true,
       pointsReussite: 60, pointsEchec: 60,

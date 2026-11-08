@@ -78,11 +78,20 @@ export interface ContratJoue {
 
 // ─── Enchères ──────────────────────────────────
 
+export interface ActionHistoriqueEnchere {
+  joueurId: number;
+  action: 'passe' | 'enchere';
+  contrat?: ContratJoue;
+  actionLabel?: string;
+  isBoucheTrou?: boolean;
+  isPasseTrou?: boolean;
+}
+
 export interface EtatEnchere {
   joueurCourantId: number;
   meilleureEnchere: ContratJoue | null;
   passesConsecutifs: number;
-  historique: { joueurId: number; action: 'passe' | 'enchere'; contrat?: ContratJoue }[];
+  historique: ActionHistoriqueEnchere[];
 }
 
 // ─── Phase de jeu ──────────────────────────────

@@ -146,8 +146,8 @@ export const SCENARIOS: Scenario[] = [
   },
   {
     id: 'gand-trou',
-    titre: 'Le Trou (3 As)',
-    description: '3 As en main : le Trou est obligatoire. L\'atout sera la couleur du 4ème As.',
+    titre: 'Le Trou (3 As & Bouche-Trou)',
+    description: '3 As en main : le Trou est obligatoire au 1er tour. Le détenteur du 4ème As répond « Bouche-Trou » et s\'associe pour 9 plis.',
     varianteId: 'whist-gand',
     contratId: 'trou',
     mains: completerMains([
@@ -159,7 +159,7 @@ export const SCENARIOS: Scenario[] = [
   {
     id: 'gand-trou-royal',
     titre: 'Le Trou Royal (4 As)',
-    description: 'Posséder les 4 As est rare ! Annoncez le Trou Royal, le partenaire a le Roi de Cœur.',
+    description: 'Posséder les 4 As est exceptionnel ! Obligatoire au 1er tour, l\'atout est Cœur et le partenaire est le détenteur du Roi de Cœur (9 plis à deux).',
     varianteId: 'whist-gand',
     contratId: 'trou_royal',
     mains: completerMains([

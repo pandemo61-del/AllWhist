@@ -5,9 +5,9 @@
 import React, { useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, Animated, Dimensions } from 'react-native';
 import { Carte, Couleur, Pli, ContratJoue, Joueur, CartePosee } from '../engine/types';
-import { CardFace, HandBack } from './Card';
+import { CardFace, CardBack, HandBack } from './Card';
 import { SYMBOLE, estRouge } from '../engine/deck';
-import { Colors, Shadows, FontWeight } from '../constants/theme';
+import { Colors, Shadows, FontWeight, CardSize } from '../constants/theme';
 import { normalize } from '../utils/normalize';
 import { useTranslation } from '../i18n';
 import { getVariante } from '../variants/index';
@@ -15,6 +15,7 @@ import { determinerGagnant } from '../engine/rules';
 
 import { useGameStore } from '../store/gameStore';
 import { DistributionAnimation } from './DistributionAnimation';
+import { TrickProgress } from './TrickProgress';
 
 const { width: SW } = Dimensions.get('window');
 
@@ -72,24 +73,35 @@ export const GameTable: React.FC<any> = ({
     <View style={styles.container}>
       {/* ── Badges fixes en haut ── */}
       {!isBidding && (
-        <View style={styles.topBadges}>
-          {atout && (
-            <View style={[styles.badge, { borderColor: estRouge(atout) ? Colors.cardRed : Colors.textPrimary }]}>
-              <Text style={[styles.bTxt, { color: estRouge(atout) ? Colors.cardRed : Colors.textPrimary, fontSize: 13 }]}>
-                {SYMBOLE[atout]} Atout
-              </Text>
+        <View style={styles.topSection}>
+          <View style={styles.topBadges}>
+            {atout && (
+              <View style={[styles.badge, { borderColor: estRouge(atout) ? Colors.cardRed : Colors.textPrimary }]}>
+                <Text style={[styles.bTxt, { color: estRouge(atout) ? Colors.cardRed : Colors.textPrimary, fontSize: 13 }]}>
+                  {SYMBOLE[atout]} Atout
+                </Text>
+              </View>
+            )}
+            {contrat && (
+              <View style={[styles.badge, styles.bContrat]}>
+                <Text style={styles.bTxtW}>
+                  {contrat.nom}
+                  {estContratTrou && contratAtout ? ` — Atout ${SYMBOLE[contratAtout]}` : ''}
+                  : {nbPlisEq}/{contrat.plisObjectif}
+                </Text>
+              </View>
+            )}
+            <View style={styles.badge}><Text style={styles.bTxt}>Pli {plisTermines.length + 1}/13</Text></View>
+          </View>
+          {contrat && phase !== 'distribution' && (
+            <View style={styles.trickProgressWrapper}>
+              <TrickProgress
+                contrat={contrat}
+                plisTermines={plisTermines}
+                nbPlisEq={nbPlisEq}
+              />
             </View>
           )}
-          {contrat && (
-            <View style={[styles.badge, styles.bContrat]}>
-              <Text style={styles.bTxtW}>
-                {contrat.nom}
-                {estContratTrou && contratAtout ? ` — Atout ${SYMBOLE[contratAtout]}` : ''}
-                : {nbPlisEq}/{contrat.plisObjectif}
-              </Text>
-            </View>
-          )}
-          <View style={styles.badge}><Text style={styles.bTxt}>Pli {plisTermines.length + 1}/13</Text></View>
         </View>
       )}
 
@@ -215,61 +227,137 @@ export const GameTable: React.FC<any> = ({
 };
 
 const PlayedCard = ({ cp, winner }: { cp: CartePosee, winner?: number }) => {
-  // Cibles ajustées pour un centrage compact et harmonieux
-  const target = [
-    { x: normalize(20), y: normalize(55) },    // Vous (Sud)
-    { x: -normalize(50), y: 0 },               // Marc (Ouest)
-    { x: normalize(20), y: -normalize(55) },   // Julie (Nord)
-    { x: normalize(90), y: 0 }                 // Paul (Est)
+  // Départ depuis la main/position du joueur
+  const startPos = [
+    { x: 0, y: normalize(220) },             // Vous (Sud) - depuis la main
+    { x: -normalize(220), y: 0 },            // Marc (Ouest) - depuis la gauche
+    { x: 0, y: -normalize(220) },            // Julie (Nord) - depuis le haut
+    { x: normalize(220), y: 0 }              // Paul (Est) - depuis la droite
   ][cp.joueurId];
 
-  // Rotation aléatoire pour un effet "dépose manuelle"
-  const randomRotate = React.useMemo(() => {
-    const deg = (Math.random() * 8) - 4; // Entre -4 et 4 degrés
-    return `${deg}deg`;
-  }, []);
+  // Position intermédiaire de la carte posée sur le tapis (proche du centre)
+  const tablePos = [
+    { x: normalize(10), y: normalize(32) },   // Sud
+    { x: -normalize(35), y: normalize(6) },  // Ouest
+    { x: -normalize(10), y: -normalize(32) }, // Nord
+    { x: normalize(35), y: -normalize(6) }   // Est
+  ];
 
-  const start = [
-    { x: 0, y: normalize(200) },
-    { x: -normalize(200), y: 0 },
-    { x: 0, y: -normalize(200) },
-    { x: normalize(200), y: 0 }
-  ][cp.joueurId];
-  const anim = useRef(new Animated.ValueXY(start)).current;
+  // Envol final vers le joueur gagnant du pli
+  const winnerPos = [
+    { x: 0, y: normalize(250) },             // Gagnant Sud
+    { x: -normalize(250), y: 0 },            // Gagnant Ouest
+    { x: 0, y: -normalize(250) },            // Gagnant Nord
+    { x: normalize(250), y: 0 }              // Gagnant Est
+  ];
+
+  const initialRotationDeg = [-3, 5, -4, 6][cp.joueurId];
+  const isWinningCard = winner !== undefined && winner === cp.joueurId;
+
+  // Regroupement SUR LA CARTE GAGNANTE (avec petit décalage naturel de 2-4px)
+  const gatherTarget = winner !== undefined ? {
+    x: tablePos[winner].x + [normalize(3), -normalize(3), -normalize(2), normalize(4)][cp.joueurId],
+    y: tablePos[winner].y + [-normalize(2), normalize(3), normalize(2), -normalize(3)][cp.joueurId],
+  } : tablePos[cp.joueurId];
+
+  const gatheredRotationDeg = [-8, 4, -5, 7][cp.joueurId];
+
+  const anim = useRef(new Animated.ValueXY(startPos)).current;
+  const scale = useRef(new Animated.Value(1.18)).current;
+  const rotateVal = useRef(new Animated.Value(initialRotationDeg)).current;
   const fade = useRef(new Animated.Value(0)).current;
+  const flipVal = useRef(new Animated.Value(0)).current;
+  const winnerGlow = useRef(new Animated.Value(0)).current;
+
+  const [isFlipped, setIsFlipped] = React.useState(false);
 
   useEffect(() => {
+    // Animation d'arrivée : la carte part de la main vers sa position sur le tapis
     Animated.parallel([
-      Animated.timing(fade, { toValue: 1, duration: 250, useNativeDriver: true }),
-      Animated.spring(anim, { toValue: target, friction: 7, tension: 40, useNativeDriver: true }),
+      Animated.timing(fade, { toValue: 1, duration: 200, useNativeDriver: true }),
+      Animated.spring(anim, { toValue: tablePos[cp.joueurId], friction: 7, tension: 45, useNativeDriver: true }),
+      Animated.timing(scale, { toValue: 1.0, duration: 300, useNativeDriver: true }),
     ]).start();
   }, []);
 
   useEffect(() => {
     if (winner !== undefined) {
+      const dest = winnerPos[winner];
+
+      // Mise en évidence par halo doré sur la carte gagnante
+      if (isWinningCard) {
+        Animated.sequence([
+          Animated.timing(winnerGlow, { toValue: 1, duration: 350, useNativeDriver: true }),
+          Animated.timing(winnerGlow, { toValue: 0.7, duration: 350, useNativeDriver: true }),
+        ]).start();
+      }
+
       Animated.sequence([
-        Animated.delay(1200),
+        // Temps d'observation des 4 cartes avec mise en évidence de la carte gagnante
+        Animated.delay(850),
+
+        // Phase 1 : Regroupement SUR LA CARTE GAGNANTE + Retournement
         Animated.parallel([
-          Animated.timing(anim, { toValue: [{ x: 20, y: 55 }, { x: -45, y: 0 }, { x: 20, y: -55 }, { x: 85, y: 0 }][winner], duration: 400, useNativeDriver: true }),
-          Animated.timing(fade, { toValue: 0, duration: 400, useNativeDriver: true }),
-        ])
+          Animated.spring(anim, { toValue: gatherTarget, friction: 8, tension: 48, useNativeDriver: true }),
+          Animated.timing(rotateVal, { toValue: gatheredRotationDeg, duration: 380, useNativeDriver: true }),
+          Animated.timing(scale, { toValue: 0.9, duration: 380, useNativeDriver: true }),
+          Animated.timing(flipVal, { toValue: 1, duration: 320, useNativeDriver: true }),
+          Animated.timing(winnerGlow, { toValue: 0, duration: 300, useNativeDriver: true }),
+        ]),
+
+        // Pause avec le tas de cartes retournées regroupées sur la carte gagnante
+        Animated.delay(280),
+
+        // Phase 2 : Envol du tas depuis la carte gagnante vers le joueur gagnant
+        Animated.parallel([
+          Animated.timing(anim, { toValue: dest, duration: 420, useNativeDriver: true }),
+          Animated.timing(scale, { toValue: 0.35, duration: 420, useNativeDriver: true }),
+          Animated.timing(fade, { toValue: 0, duration: 420, useNativeDriver: true }),
+        ]),
       ]).start();
+
+      // Bascule vers le verso de la carte pendant le flip
+      const timer = setTimeout(() => {
+        setIsFlipped(true);
+      }, 1020);
+
+      return () => clearTimeout(timer);
     }
   }, [winner]);
+
+  const rotateStr = rotateVal.interpolate({
+    inputRange: [-180, 180],
+    outputRange: ['-180deg', '180deg'],
+  });
+
+  const flipInterpolate = flipVal.interpolate({
+    inputRange: [0, 0.5, 1],
+    outputRange: ['0deg', '90deg', '0deg'],
+  });
 
   return (
     <Animated.View style={[
       styles.pCard,
+      isWinningCard && styles.winningCardGlow,
       {
         opacity: fade,
         transform: [
           { translateX: anim.x },
           { translateY: anim.y },
-          { rotate: randomRotate }
+          { scale },
+          { rotate: rotateStr },
+          { rotateY: flipInterpolate },
         ]
       }
     ]}>
-      <CardFace carte={cp.carte} taille="table" />
+      {isWinningCard && (
+        <Animated.View style={[styles.glowBorder, { opacity: winnerGlow }]} pointerEvents="none" />
+      )}
+      {isFlipped ? (
+        <CardBack style={{ width: CardSize.table.width, height: CardSize.table.height }} />
+      ) : (
+        <CardFace carte={cp.carte} taille="table" />
+      )}
     </Animated.View>
   );
 };
@@ -289,7 +377,7 @@ const Player = ({ j, active, plis, eq, ann, part, orient = 'horizontal', hum, ob
   } else if (part) {
     if (contratId === 'propose') roleLabel = "Emballe";
     else if (contratId === 'demande') roleLabel = "Réponse";
-    else if (contratId === 'trou' || contratId === 'trou_royal') roleLabel = "Boucle";
+    else if (contratId === 'trou' || contratId === 'trou_royal') roleLabel = "Bouche-Trou";
     else roleLabel = "Parten.";
   }
 
@@ -337,7 +425,9 @@ const Player = ({ j, active, plis, eq, ann, part, orient = 'horizontal', hum, ob
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#f4f7f9', borderRadius: 20, margin: 8, overflow: 'hidden' },
-  topBadges: { flexDirection: 'row', justifyContent: 'center', gap: 8, paddingVertical: 10, zIndex: 10 },
+  topSection: { alignItems: 'center', zIndex: 10, paddingTop: 6, paddingBottom: 2 },
+  topBadges: { flexDirection: 'row', justifyContent: 'center', gap: 8, paddingVertical: 4 },
+  trickProgressWrapper: { alignItems: 'center', marginTop: 4, marginBottom: 2 },
   badge: { backgroundColor: '#fff', borderRadius: 20, paddingHorizontal: 10, paddingVertical: 4, ...Shadows.card, borderWidth: 0.5, borderColor: '#ddd' },
   bContrat: { backgroundColor: '#146e52' },
   bTxt: { fontSize: 11, color: '#455a64', fontWeight: 'bold' },

@@ -400,9 +400,10 @@ export function choisirEnchere(
   niveau: NiveauIA,
   joueurId = 0,
   preferenceCouleurs?: Couleur[],
+  premierTourAs = false,
 ): DecisionEnchere {
   if (variante.id === 'whist-gand') {
-    return chooseWhistBid(main, meilleureEnchere, niveau, joueurId, variante.contrats);
+    return chooseWhistBid(main, meilleureEnchere, niveau, joueurId, variante.contrats, { premierTourAs });
   }
 
   const { force, meilleureCol, nbAtouts } = evaluerForceAvancee(main);

@@ -13,7 +13,7 @@ import {
   EtatPartie, PhaseJeu, Joueur, Pli, ContratJoue,
   Carte, Couleur, EtatEnchere,
 } from '../engine/types';
-import { creerJeu, melanger, distribuer, trierMain } from '../engine/deck';
+import { creerJeu, melanger, distribuer, trierMain, SYMBOLE } from '../engine/deck';
 import {
   cartesJouables, determinerGagnant,
   compterPlisParJoueur, mancheTerminee,
@@ -299,13 +299,15 @@ export const useGameStore = create<GameStore>()(
       priorite: contratConfig.priorite,
     };
 
+    const actionLabel = `${contrat.nom}${contrat.atout ? ` ${SYMBOLE[contrat.atout] || ''}` : ''}`;
+
     const nouvelEtat: EtatEnchere = {
       ...state.etatEnchere,
       meilleureEnchere: contrat,
       passesConsecutifs: 0,
       historique: [
         ...state.etatEnchere.historique,
-        { joueurId: state.etatEnchere.joueurCourantId, action: 'enchere', contrat },
+        { joueurId: state.etatEnchere.joueurCourantId, action: 'enchere', contrat, actionLabel },
       ],
       joueurCourantId: (state.etatEnchere.joueurCourantId + 1) % 4,
     };
@@ -327,38 +329,52 @@ export const useGameStore = create<GameStore>()(
       proposantId === etatEnchere.joueurCourantId;
 
     let partenaireRévélé = state.partenaireRévélé;
-    let contratEnCours = state.contratEnCours;
+    let isBoucheTrou = false;
+    let isPasseTrou = false;
+    let actionLabel = 'Passe';
 
-    // Si on passe alors qu'un Trou est annoncé et qu'on a le 4ème As, on "bouche"
-    if (etatEnchere.meilleureEnchere?.id === 'trou' || etatEnchere.meilleureEnchere?.id === 'trou_royal') {
-      const targetAce = etatEnchere.meilleureEnchere.asPartenaire;
-      const aLAs = joueurs[etatEnchere.joueurCourantId].main.some(c =>
-        c.valeur === targetAce?.valeur && c.couleur === targetAce?.couleur
-      );
+    const meilleureEnchere = etatEnchere.meilleureEnchere;
+
+    // Si on passe alors qu'un Trou est annoncé et qu'on a le 4ème As (ou Roi de Cœur), on "bouche"
+    if (meilleureEnchere && (meilleureEnchere.id === 'trou' || meilleureEnchere.id === 'trou_royal')) {
+      const targetAce = meilleureEnchere.asPartenaire;
+      const joueurCourantMain = joueurs[etatEnchere.joueurCourantId]?.main || [];
+      const aLAs = targetAce
+        ? joueurCourantMain.some(c => c.valeur === targetAce.valeur && c.couleur === targetAce.couleur)
+        : false;
 
       if (aLAs) {
-        // Le joueur accepte tacitement (ou via le bouton "Je bouche")
+        isBoucheTrou = true;
+        actionLabel = 'Bouche-Trou';
         partenaireRévélé = true;
-        // On ne fixe pas encore contratEnCours car l'enchère n'est pas techniquement finie
-        // (quelqu'un pourrait dire Solo par dessus), mais on pourra utiliser cette info
+        meilleureEnchere.partenaireId = etatEnchere.joueurCourantId;
       }
+    } else if (!meilleureEnchere && historique.length < 4) {
+      isPasseTrou = true;
+      actionLabel = 'Passe-trou';
     }
 
     const nouvelEtat: EtatEnchere = {
       ...state.etatEnchere,
-      meilleureEnchere: proposantRefuse ? null : state.etatEnchere.meilleureEnchere,
+      meilleureEnchere: proposantRefuse ? null : meilleureEnchere,
       passesConsecutifs: proposantRefuse ? 1 : state.etatEnchere.passesConsecutifs + 1,
       historique: [
         ...state.etatEnchere.historique,
-        { joueurId: state.etatEnchere.joueurCourantId, action: 'passe' },
+        {
+          joueurId: state.etatEnchere.joueurCourantId,
+          action: 'passe',
+          actionLabel,
+          isBoucheTrou,
+          isPasseTrou,
+        },
       ],
       joueurCourantId: (state.etatEnchere.joueurCourantId + 1) % 4,
     };
 
     set({ etatEnchere: nouvelEtat, partenaireRévélé });
 
-    // On force l'avancement immédiat pour débloquer l'action
-    get()._avancerEncheres();
+    // Avancer les enchères avec un petit délai pour la lisibilité et la fluidité UI
+    setTimeout(() => get()._avancerEncheres(), 400);
   },
 
   // ──────────────────────────────────────────
@@ -392,7 +408,10 @@ export const useGameStore = create<GameStore>()(
 
       if (mancheTerminee(nouveauxPlis, state.contratEnCours!)) {
         // Analyser toutes les erreurs de la manche
-        const toutesErreurs = nouveauxPlis.flatMap(p => analyserPli(p, state.contratEnCours!, state.atout, nouveauxPlis));
+        const toutesErreurs = nouveauxPlis.flatMap((pli, index) =>
+          analyserPli(pli, state.contratEnCours!, state.atout, nouveauxPlis)
+            .map(avis => ({ ...avis, pliNum: index + 1 })),
+        );
 
         // Calculer le score de la manche
         const plisCpte = compterPlisParJoueur(nouveauxPlis);
@@ -524,7 +543,7 @@ export const useGameStore = create<GameStore>()(
       },
     });
 
-    if (phaseSuivante !== 'distribution' && variante.atoutChoisi && ((nouveauDonneur + 1) % 4 !== 0 || settings.autoJeu)) {
+    if (phaseSuivante !== 'distribution' && variante.atoutChoisi && ((nouveauDonneur + 1) % 4 !== 0 || settings.autoEnchere || settings.autoJeu)) {
       setTimeout(() => get()._faireProchaineActionIA(), 600);
     }
   },
@@ -593,7 +612,7 @@ export const useGameStore = create<GameStore>()(
 
     set({ phase: phaseSuivante });
 
-    if (phaseSuivante === 'encheres' || (state.tourDeJoueur !== 0 || settings.autoJeu)) {
+    if (phaseSuivante === 'encheres' || (state.tourDeJoueur !== 0 || settings.autoJeu || settings.autoEnchere)) {
       setTimeout(() => get()._faireProchaineActionIA(), 400);
     }
   },
@@ -723,6 +742,24 @@ export const useGameStore = create<GameStore>()(
       etatEnchere.meilleureEnchere === null;
 
     if (tousPassé) {
+      if (variante.id === 'whist-gand' && !state.estScenario && etatEnchere.historique.length === 4) {
+        const nouvelEtat = { ...etatEnchere, passesConsecutifs: 0 };
+        const notification = {
+          title: 'Tour des As terminé',
+          message: 'Aucun Trou annoncé. Les enchères ordinaires commencent.',
+        };
+        set({ etatEnchere: nouvelEtat, notification });
+        setTimeout(() => {
+          if (get().notification === notification) set({ notification: null });
+        }, 5000);
+
+        const settings = useSettingsStore.getState();
+        if (nouvelEtat.joueurCourantId !== 0 || settings.autoEnchere) {
+          setTimeout(() => get()._avancerEncheres(), 400);
+        }
+        return;
+      }
+
       const { langue } = useSettingsStore.getState();
       set({
         notification: {
@@ -815,6 +852,8 @@ export const useGameStore = create<GameStore>()(
       etatEnchere.meilleureEnchere,
       niveau,
       etatEnchere.joueurCourantId,
+      undefined,
+      variante.id === 'whist-gand' && !state.estScenario && etatEnchere.historique.length < 4,
     );
 
     if (decision.action === 'passe') {

@@ -53,6 +53,9 @@ export const BidPanel: React.FC<BidPanelProps> = ({
   const { t } = useTranslation();
   const estScenario = useGameStore(s => s.estScenario);
   const scenarioActuel = useGameStore(s => s.scenarioActuel);
+  const historiqueEncheres = useGameStore(s => s.etatEnchere.historique);
+
+  const estPremierTour = variante.id === 'whist-gand' && !estScenario && (historiqueEncheres?.length || 0) < 4;
 
   // Pré-sélection de l'annonce cible du scénario
   React.useEffect(() => {
@@ -67,8 +70,8 @@ export const BidPanel: React.FC<BidPanelProps> = ({
   // Recommendation IA pour l'apprentissage
   const recommendation = React.useMemo(() => {
     if (!modeApprentissage) return null;
-    return choisirEnchere(main, variante, meilleureEnchere as any, 'expert', 0, ordreCouleurs);
-  }, [main, variante, meilleureEnchere, modeApprentissage, ordreCouleurs]);
+    return choisirEnchere(main, variante, meilleureEnchere as any, 'expert', 0, ordreCouleurs, estPremierTour);
+  }, [main, variante, meilleureEnchere, modeApprentissage, ordreCouleurs, estPremierTour]);
 
   const handleUnlockCoach = () => {
     if (useCoachCredit()) {
@@ -105,6 +108,13 @@ export const BidPanel: React.FC<BidPanelProps> = ({
     if (c.id === 'passe') return false;
 
     const currentPrio = meilleureEnchere?.priorite ?? -1;
+
+    if (estPremierTour) {
+      const nbAs = main.filter(card => card.valeur === 14).length;
+      if (c.id === 'trou') return nbAs === 3 && currentPrio < 7;
+      if (c.id === 'trou_royal') return nbAs === 4 && currentPrio < 7.5;
+      return false;
+    }
 
     // "Je propose" est disponible si aucune enchère n'a été faite (priorité -1 ou 0)
     if (c.id === 'propose') {
@@ -240,7 +250,29 @@ export const BidPanel: React.FC<BidPanelProps> = ({
             </View>
           </View>
         ) : (
-          <Text style={styles.sousTitre}>Aucune enchère — soyez le premier</Text>
+          <Text style={styles.sousTitre}>
+            {estPremierTour ? "1er tour des As : annoncez un Trou ou dites Passe-trou" : "Aucune enchère — soyez le premier"}
+          </Text>
+        )}
+
+        {/* Historique du tour de table */}
+        {historiqueEncheres && historiqueEncheres.length > 0 && (
+          <View style={styles.historyBox}>
+            <Text style={styles.historyTitle}>Tour de table :</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.historyScroll}>
+              {historiqueEncheres.map((h, idx) => {
+                const jNom = joueurs[h.joueurId]?.nom || `J${h.joueurId + 1}`;
+                const label = h.actionLabel || (h.action === 'passe' ? (h.isBoucheTrou ? 'Bouche-Trou' : (h.isPasseTrou ? 'Passe-trou' : 'Passe')) : (h.contrat?.nom || 'Enchère'));
+                const isTrou = h.isBoucheTrou || h.contrat?.id === 'trou' || h.contrat?.id === 'trou_royal';
+                return (
+                  <View key={idx} style={[styles.historyBadge, isTrou && styles.historyBadgeTrou]}>
+                    <Text style={[styles.historyPlayer, isTrou && styles.historyPlayerTrou]}>{jNom}</Text>
+                    <Text style={[styles.historyAction, isTrou && styles.historyActionTrou]}>{label}</Text>
+                  </View>
+                );
+              })}
+            </ScrollView>
+          </View>
         )}
       </View>
 
@@ -404,12 +436,12 @@ export const BidPanel: React.FC<BidPanelProps> = ({
           </View>
         )}
 
-        {/* Bouton Passer (même look que les autres) */}
+        {/* Bouton Passer / Bouche-Trou / Passe-trou */}
         <TouchableOpacity
           style={[
             styles.contratBtn,
             forceTrou && styles.btnDisabled,
-            peutBoucher && { borderColor: Colors.primary, backgroundColor: '#f0fcf9' }
+            peutBoucher && styles.contratBtnBoucheTrou,
           ]}
           onPress={() => {
             if (useSettingsStore.getState().vibration) Vibration.vibrate(20);
@@ -418,16 +450,34 @@ export const BidPanel: React.FC<BidPanelProps> = ({
           disabled={!!forceTrou}
         >
           <View style={styles.contratInfo}>
-            <Text style={[styles.contratNom, peutBoucher && { color: Colors.primary }]}>
-              {forceTrou ? "Trou Obligatoire" : (peutBoucher ? "Je bouche (Accepter)" : "Passer")}
+            <Text style={[
+              styles.contratNom,
+              peutBoucher && styles.contratNomBoucheTrou,
+              estPremierTour && { color: Colors.textSecondary },
+            ]}>
+              {forceTrou
+                ? (forceTrou === 'trou_royal' ? 'Trou Royal Obligatoire (4 As)' : 'Trou Obligatoire (3 As)')
+                : (peutBoucher
+                    ? (meilleureEnchere?.id === 'trou_royal' ? 'Bouche-Trou (Roi de Cœur)' : 'Bouche-Trou (4ème As)')
+                    : (estPremierTour ? 'Passe-trou (Moins de 3 As)' : 'Passer'))}
             </Text>
             <Text style={styles.contratDesc}>
-              {forceTrou ? "Vous devez annoncer le Trou." : "Je ne joue pas ce coup."}
+              {forceTrou
+                ? 'Vous détenez 3 ou 4 As et devez obligatoirement déclarer le Trou.'
+                : (peutBoucher
+                    ? (meilleureEnchere?.id === 'trou_royal'
+                        ? "Vous possédez le Roi de Cœur appelé et rejoignez l'annonceur pour 9 plis."
+                        : "Vous possédez le 4ème As et rejoignez l'annonceur pour réaliser 9 plis à deux.")
+                    : (estPremierTour
+                        ? "Je n'ai pas 3 ou 4 As pour annoncer un Trou."
+                        : "Je ne joue pas ce coup."))}
             </Text>
           </View>
-          <View style={styles.pointsBadge}>
-            <Text style={[styles.pointsVal, { color: Colors.textMuted }]}>0</Text>
-            <Text style={styles.pointsLabel}>pts</Text>
+          <View style={[styles.pointsBadge, peutBoucher && styles.pointsBadgeBoucheTrou]}>
+            <Text style={[styles.pointsVal, { color: peutBoucher ? '#b45309' : Colors.textMuted }]}>
+              {peutBoucher ? (meilleureEnchere?.pointsReussite ?? 30) : 0}
+            </Text>
+            <Text style={[styles.pointsLabel, peutBoucher && { color: '#b45309' }]}>pts</Text>
           </View>
         </TouchableOpacity>
 
@@ -816,6 +866,70 @@ const styles = StyleSheet.create({
   btnPasseTexte: {
     fontSize: FontSize.sm,
     color: Colors.textMuted,
+  },
+
+  // Tour de table / Historique
+  historyBox: {
+    marginTop: Spacing.xs,
+    marginBottom: Spacing.xs,
+  },
+  historyTitle: {
+    fontSize: 10,
+    fontWeight: FontWeight.bold,
+    color: Colors.textMuted,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    marginBottom: 4,
+  },
+  historyScroll: {
+    flexDirection: 'row',
+    gap: 6,
+    paddingVertical: 2,
+  },
+  historyBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: Colors.bgInput,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: Radius.full,
+    borderWidth: 0.5,
+    borderColor: Colors.border,
+  },
+  historyBadgeTrou: {
+    backgroundColor: '#fef3c7',
+    borderColor: '#f59e0b',
+  },
+  historyPlayer: {
+    fontSize: 11,
+    fontWeight: FontWeight.bold,
+    color: Colors.textSecondary,
+  },
+  historyPlayerTrou: {
+    color: '#b45309',
+  },
+  historyAction: {
+    fontSize: 11,
+    color: Colors.textMuted,
+  },
+  historyActionTrou: {
+    color: '#92400e',
+    fontWeight: FontWeight.semibold,
+  },
+  contratBtnBoucheTrou: {
+    borderColor: '#f59e0b',
+    backgroundColor: '#fffbeb',
+  },
+  contratNomBoucheTrou: {
+    color: '#d97706',
+    fontWeight: FontWeight.black,
+  },
+  pointsBadgeBoucheTrou: {
+    backgroundColor: '#fef3c7',
+    borderRadius: Radius.sm,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
   },
 
   // Overlay IA

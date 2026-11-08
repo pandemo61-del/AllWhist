@@ -37,13 +37,13 @@ export const initializeSync = () => {
       // Filtrer pour ne garder que les données, pas les fonctions de Zustand
       const {
         ordreCouleurs, ordreValeur, directionTri,
-        autoJeu, langue, hasSeenOnboarding,
+        autoJeu, autoEnchere, langue, hasSeenOnboarding,
         vibration, son
       } = state;
 
       saveUserSettings(user.uid, {
         ordreCouleurs, ordreValeur, directionTri,
-        autoJeu, langue, hasSeenOnboarding,
+        autoJeu, autoEnchere, langue, hasSeenOnboarding,
         vibration, son
       });
     }

@@ -67,8 +67,6 @@ export const ContractAnnouncement: React.FC<Props> = ({ contrat, joueurs, atout 
 
         <View style={styles.divider} />
 
-        <View style={styles.divider} />
-
         <View style={styles.infoRow}>
           <Text style={styles.infoLabel}>Annonceur :</Text>
           <Text style={styles.infoValue}>{annonceur.nom} {contrat.joueurId === 0 ? '(Vous)' : ''}</Text>
@@ -78,9 +76,15 @@ export const ContractAnnouncement: React.FC<Props> = ({ contrat, joueurs, atout 
           <View style={styles.infoRow}>
             <Text style={styles.infoLabel}>Partenaire :</Text>
             <Text style={styles.infoValue}>
-              {contrat.asPartenaire
-                ? `Porteur de l'As de ${SYMBOLE[contrat.asPartenaire.couleur]}`
-                : partenaire ? partenaire.nom : 'À révéler'}
+              {partenaire
+                ? (contrat.id === 'trou' || contrat.id === 'trou_royal'
+                    ? `${partenaire.nom} (Bouche-Trou)`
+                    : partenaire.nom)
+                : (contrat.asPartenaire
+                    ? (contrat.id === 'trou_royal'
+                        ? "Détenteur du Roi de Cœur"
+                        : `Porteur du 4ème As (${SYMBOLE[contrat.asPartenaire.couleur]})`)
+                    : 'À révéler')}
             </Text>
           </View>
         )}

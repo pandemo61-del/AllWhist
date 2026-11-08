@@ -138,6 +138,34 @@ export default function GameScreen() {
     }
   }, [isClosed, isEndGameClosed, prochaineAction, avancerManche, load]);
 
+  const { autoEnchere, autoJeu } = useSettingsStore();
+
+  // Enchère automatique pour le joueur humain
+  useEffect(() => {
+    if (phase === 'encheres' && etatEnchere?.joueurCourantId === 0 && autoEnchere) {
+      const timer = setTimeout(() => {
+        const state = useGameStore.getState();
+        if (state.phase === 'encheres' && state.etatEnchere.joueurCourantId === 0) {
+          state._avancerEncheres();
+        }
+      }, 400);
+      return () => clearTimeout(timer);
+    }
+  }, [phase, etatEnchere?.joueurCourantId, autoEnchere]);
+
+  // Jeu automatique pour le joueur humain
+  useEffect(() => {
+    if (phase === 'jeu' && tourDeJoueur === 0 && autoJeu) {
+      const timer = setTimeout(() => {
+        const state = useGameStore.getState();
+        if (state.phase === 'jeu' && state.tourDeJoueur === 0) {
+          state._faireProchaineActionIA();
+        }
+      }, 500);
+      return () => clearTimeout(timer);
+    }
+  }, [phase, tourDeJoueur, autoJeu]);
+
   // Récupère la variante (sécurisé)
   const variante = React.useMemo(() => {
     try { return getVariante(varianteId ?? ''); } catch { return null; }

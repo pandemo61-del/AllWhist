@@ -83,8 +83,26 @@ export const useSettingsStore = create<SettingsState>()(
       setOrdreCouleurs: (ordre) => set({ ordreCouleurs: ordre }),
       setOrdreValeur: (ordre) => set({ ordreValeur: ordre }),
       setDirectionTri: (direction) => set({ directionTri: direction }),
-      setAutoJeu: (auto) => set({ autoJeu: auto }),
-      setAutoEnchere: (auto) => set({ autoEnchere: auto }),
+      setAutoJeu: (auto) => {
+        set({ autoJeu: auto });
+        if (auto) {
+          const { useGameStore } = require('./gameStore');
+          const gameStore = useGameStore.getState();
+          if (gameStore.phase === 'jeu' && gameStore.tourDeJoueur === 0) {
+            setTimeout(() => gameStore._faireProchaineActionIA(), 200);
+          }
+        }
+      },
+      setAutoEnchere: (auto) => {
+        set({ autoEnchere: auto });
+        if (auto) {
+          const { useGameStore } = require('./gameStore');
+          const gameStore = useGameStore.getState();
+          if (gameStore.phase === 'encheres' && gameStore.etatEnchere.joueurCourantId === 0) {
+            setTimeout(() => gameStore._avancerEncheres(), 200);
+          }
+        }
+      },
       setLangue: (langue) => set({ langue }),
       setHasSeenOnboarding: (val) => set({ hasSeenOnboarding: val }),
       setVibration: (val) => set({ vibration: val }),

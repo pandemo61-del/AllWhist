@@ -4,6 +4,7 @@
 
 import { ContratJoue } from './types';
 import { ScoreManche } from './types';
+import { calculerReussiteWhist, calculerScoreWhistGand } from '../../shared/game-domain.js';
 
 export interface ResultatManche {
   reussite: boolean;
@@ -18,16 +19,7 @@ export function evaluerReussite(
   contrat: ContratJoue,
   plisParJoueur: Record<number, number>,
 ): boolean {
-  const plisJoueur     = plisParJoueur[contrat.joueurId] ?? 0;
-  const plisPartenaire = contrat.partenaireId !== undefined
-    ? (plisParJoueur[contrat.partenaireId] ?? 0)
-    : 0;
-  const total = plisJoueur + plisPartenaire;
-
-  // Misère / Misère ouverte : aucun pli
-  if (contrat.id.includes('misere')) return total === 0;
-
-  return total >= contrat.plisObjectif;
+  return calculerReussiteWhist(contrat, plisParJoueur);
 }
 
 // ─── Score générique Whist (Demande/Solo/Abondance) ─
@@ -92,78 +84,9 @@ export function calculerScoreWhistBelge(
   contrat: ContratJoue,
   plisParJoueur: Record<number, number>,
   _joueurs?: any[],
-  nbJoueurs = 4,
+  _nbJoueurs = 4,
 ): ResultatManche {
-  const reussite = evaluerReussite(contrat, plisParJoueur);
-  const delta: Record<number, number> = {};
-  const joueurIds = Object.keys(plisParJoueur).map(Number);
-  joueurIds.forEach(id => delta[id] = 0);
-
-  const defenseIds = joueurIds.filter(
-    id => id !== contrat.joueurId && id !== contrat.partenaireId,
-  );
-
-  const plisJoueur = plisParJoueur[contrat.joueurId] ?? 0;
-  const plisPartenaire = contrat.partenaireId !== undefined
-    ? (plisParJoueur[contrat.partenaireId] ?? 0)
-    : 0;
-  const plisTotal = plisJoueur + plisPartenaire;
-
-  // Calcul du montant de base par adversaire
-  let montantParAdversaire = reussite ? contrat.pointsReussite : contrat.pointsEchec;
-
-  // Bonus Surplis (pour tous les contrats à l'atout avec un objectif de plis > 0 hors Chelem)
-  if (reussite && !contrat.sanAtout && contrat.plisObjectif > 0 && contrat.id !== 'chelem') {
-    const surplis = plisTotal - contrat.plisObjectif;
-    if (surplis > 0) {
-      montantParAdversaire += surplis; // +1 pt par surplis par adversaire
-    }
-  }
-
-  if (reussite) {
-    const totalGagné = montantParAdversaire * defenseIds.length;
-
-    if (contrat.partenaireId !== undefined) {
-      // Partage entre partenaires (50/50)
-      const part = Math.floor(totalGagné / 2);
-      delta[contrat.joueurId] = part;
-      delta[contrat.partenaireId] = totalGagné - part;
-    } else {
-      // Soliste prend tout
-      delta[contrat.joueurId] = totalGagné;
-    }
-
-    // Défenseurs paient
-    for (const id of defenseIds) {
-      delta[id] = -montantParAdversaire;
-    }
-  } else {
-    const totalPerdu = montantParAdversaire * defenseIds.length;
-
-    if (contrat.partenaireId !== undefined) {
-      // Partenaires paient à la défense
-      const part = Math.floor(totalPerdu / 2);
-      delta[contrat.joueurId] = -part;
-      delta[contrat.partenaireId] = -(totalPerdu - part);
-    } else {
-      // Soliste paie tout
-      delta[contrat.joueurId] = -totalPerdu;
-    }
-
-    // Défenseurs reçoivent
-    for (const id of defenseIds) {
-      delta[id] = montantParAdversaire;
-    }
-  }
-
-  return {
-    reussite,
-    plisJoueurEtPartenaire: plisTotal,
-    deltaScores: delta,
-    details: reussite
-      ? `✓ ${contrat.nom} réussi (+${delta[contrat.joueurId]} pts)`
-      : `✗ ${contrat.nom} chute (−${Math.abs(delta[contrat.joueurId])} pts)`,
-  };
+  return calculerScoreWhistGand(contrat, plisParJoueur);
 }
 
 // ─── Score Whist Classique ─────────────────────
