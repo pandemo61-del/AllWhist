@@ -115,7 +115,7 @@ export const WhistGand: VariantConfig = {
       seul: true, partenaire: false,
       pointsReussite: 40, pointsEchec: 40,
       sanAtout: false, cartesVisibles: false,
-      priorite: 6,
+      priorite: 8,
     },
     {
       id: 'trou',
@@ -147,7 +147,7 @@ export const WhistGand: VariantConfig = {
       seul: true, partenaire: false,
       pointsReussite: 50, pointsEchec: 50,
       sanAtout: false, cartesVisibles: false,
-      priorite: 8,
+      priorite: 9,
     },
     {
       id: 'misere',
@@ -157,7 +157,7 @@ export const WhistGand: VariantConfig = {
       seul: true, partenaire: false,
       pointsReussite: 60, pointsEchec: 60,
       sanAtout: true, cartesVisibles: false,
-      priorite: 9,
+      priorite: 12,
     },
     {
       id: 'abondance_11',
@@ -177,7 +177,7 @@ export const WhistGand: VariantConfig = {
       seul: true, partenaire: false,
       pointsReussite: 100, pointsEchec: 100,
       sanAtout: false, cartesVisibles: false,
-      priorite: 10.5,
+      priorite: 11,
     },
     {
       id: 'misere_ouverte',
@@ -187,7 +187,7 @@ export const WhistGand: VariantConfig = {
       seul: true, partenaire: false,
       pointsReussite: 120, pointsEchec: 120,
       sanAtout: true, cartesVisibles: true,
-      priorite: 11,
+      priorite: 13,
     },
     {
       id: 'chelem',
@@ -197,7 +197,7 @@ export const WhistGand: VariantConfig = {
       seul: true, partenaire: false,
       pointsReussite: 250, pointsEchec: 250,
       sanAtout: false, cartesVisibles: false,
-      priorite: 12,
+      priorite: 14,
     },
   ],
   nbJoueurs: 4,
