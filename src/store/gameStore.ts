@@ -54,6 +54,9 @@ interface GameStore extends EtatPartie {
   /** Passe au pli suivant (après affichage du résultat). */
   avancerPli: () => void;
 
+  /** Programme une action IA valide uniquement si l'état de jeu ciblé est toujours courant. */
+  _programmerActionIA: (delai?: number) => void;
+
   /** Passe à la manche suivante ou redistribue si tout le monde a passé. */
   avancerManche: (estRedistribution?: boolean) => void;
 
@@ -112,6 +115,7 @@ const ETAT_INITIAL: EtatPartie = {
 
 const NOMS_IA = ['Marc', 'Julie', 'Paul'];
 const NIVEAUX_IA: NiveauIA[] = ['moyen', 'moyen', 'expert'];
+const plisEnTransition = new WeakSet<object>();
 
 // Helper pour préparer le contrat d'un scénario d'apprentissage
 function preparerContratScenario(scenario: Scenario, variante: VariantConfig, mainHumain: Carte[]): { contrat: ContratJoue; atout: Couleur | null; phase: PhaseJeu } {
@@ -226,7 +230,7 @@ export const useGameStore = create<GameStore>()(
 
     // Lancer l'IA si elle commence (ou autoEnchere / autoJeu)
     if (phaseInitiale !== 'distribution' && variante.atoutChoisi && ((donneur + 1) % 4 !== 0 || useSettingsStore.getState().autoEnchere)) {
-      setTimeout(() => get()._faireProchaineActionIA(), 600);
+      get()._programmerActionIA(600);
     }
   },
 
@@ -391,7 +395,8 @@ export const useGameStore = create<GameStore>()(
 
   avancerPli() {
     const state = get();
-    if (state.phase !== 'fin_pli') return;
+    if (state.phase !== 'fin_pli' || plisEnTransition.has(state.pliEnCours)) return;
+    plisEnTransition.add(state.pliEnCours);
 
     const gagnant = state.pliEnCours.gagnantId!;
     const pliTermine = state.pliEnCours;
@@ -399,6 +404,9 @@ export const useGameStore = create<GameStore>()(
 
     // On attend que les animations de ramassage (2s + 1s mouvement) soient finies avant de nettoyer la table
     setTimeout(() => {
+      const current = get();
+      if (current.phase !== 'fin_pli' || current.pliEnCours !== pliTermine) return;
+
       const contrat = state.contratEnCours!;
       const estMisere = contrat?.id.startsWith('misere');
       const miserePerdue = estMisere && gagnant === contrat.joueurId;
@@ -476,7 +484,7 @@ export const useGameStore = create<GameStore>()(
         // IA si ce n'est pas l'humain
         const settings = useSettingsStore.getState();
         if (gagnant !== 0 || settings.autoJeu) {
-          get()._faireProchaineActionIA();
+          get()._programmerActionIA();
         }
       }
     }, 3200); // 2s pause + ~1s animation
@@ -544,7 +552,7 @@ export const useGameStore = create<GameStore>()(
     });
 
     if (phaseSuivante !== 'distribution' && variante.atoutChoisi && ((nouveauDonneur + 1) % 4 !== 0 || settings.autoEnchere || settings.autoJeu)) {
-      setTimeout(() => get()._faireProchaineActionIA(), 600);
+      get()._programmerActionIA(600);
     }
   },
 
@@ -568,7 +576,7 @@ export const useGameStore = create<GameStore>()(
       pliEnCours: { numero: 0, cartesJouees: [] },
     });
     if ((state.donneur + 1) % 4 !== 0 || settings.autoJeu) {
-      get()._faireProchaineActionIA();
+      get()._programmerActionIA();
     }
   },
 
@@ -596,7 +604,7 @@ export const useGameStore = create<GameStore>()(
         });
         const currentSettings = useSettingsStore.getState();
         if ((state.donneur + 1) % 4 !== 0 || currentSettings.autoJeu) {
-          get()._faireProchaineActionIA();
+          get()._programmerActionIA();
         }
       }, 800);
     }
@@ -613,7 +621,7 @@ export const useGameStore = create<GameStore>()(
     set({ phase: phaseSuivante });
 
     if (phaseSuivante === 'encheres' || (state.tourDeJoueur !== 0 || settings.autoJeu || settings.autoEnchere)) {
-      setTimeout(() => get()._faireProchaineActionIA(), 400);
+      get()._programmerActionIA(400);
     }
   },
 
@@ -662,6 +670,11 @@ export const useGameStore = create<GameStore>()(
   _poserCarte(carte: Carte, joueurId: number) {
     const state = get();
 
+    if (state.phase !== 'jeu' || state.tourDeJoueur !== joueurId) {
+      if (__DEV__) console.warn(`Carte ignorée : ce n'est pas le tour du joueur ${joueurId}.`);
+      return;
+    }
+
     if (!carte) {
       if (__DEV__) console.warn(`_poserCarte appelée avec une carte indéfinie pour le joueur ${joueurId}.`);
       return;
@@ -674,6 +687,16 @@ export const useGameStore = create<GameStore>()(
     }
 
     const joueur = state.joueurs[joueurId];
+    if (!joueur?.main.some(c => c.id === carte.id)) {
+      if (__DEV__) console.warn(`Carte ignorée : elle n'est plus dans la main du joueur ${joueurId}.`);
+      return;
+    }
+    const legales = cartesJouables(joueur.main, state.pliEnCours, state.atout ?? undefined);
+    if (!legales.some(c => c.id === carte.id)) {
+      if (__DEV__) console.warn(`Carte ignorée : elle n'est pas jouable par le joueur ${joueurId}.`);
+      return;
+    }
+
     const couleurDemandee = state.pliEnCours.cartesJouees.length === 0
       ? carte.couleur
       : state.pliEnCours.couleurDemandee;
@@ -723,7 +746,7 @@ export const useGameStore = create<GameStore>()(
 
       const settings = useSettingsStore.getState();
       if (prochain !== 0 || settings.autoJeu) {
-        setTimeout(() => get()._faireProchaineActionIA(), 500);
+        get()._programmerActionIA(500);
       }
     }
   },
@@ -832,7 +855,7 @@ export const useGameStore = create<GameStore>()(
             pliEnCours: { numero: 0, cartesJouees: [] },
           });
           if ((state.donneur + 1) % 4 !== 0 || currentSettings.autoJeu) {
-            get()._faireProchaineActionIA();
+            get()._programmerActionIA();
           }
         }
       }, 3000);
@@ -866,6 +889,18 @@ export const useGameStore = create<GameStore>()(
         : undefined;
       get().placerEnchere(decision.contratId!, decision.atout, asPartenaire);
     }
+  },
+
+  _programmerActionIA(delai = 0) {
+    const cible = get();
+    const pliCible = cible.pliEnCours;
+    const enchereCible = cible.etatEnchere;
+    setTimeout(() => {
+      const courant = get();
+      if (courant.phase !== cible.phase || courant.tourDeJoueur !== cible.tourDeJoueur ||
+          courant.pliEnCours !== pliCible || courant.etatEnchere !== enchereCible) return;
+      courant._faireProchaineActionIA();
+    }, delai);
   },
 
   _faireProchaineActionIA() {

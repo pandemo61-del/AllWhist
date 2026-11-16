@@ -89,7 +89,7 @@ export const useSettingsStore = create<SettingsState>()(
           const { useGameStore } = require('./gameStore');
           const gameStore = useGameStore.getState();
           if (gameStore.phase === 'jeu' && gameStore.tourDeJoueur === 0) {
-            setTimeout(() => gameStore._faireProchaineActionIA(), 200);
+            gameStore._programmerActionIA(200);
           }
         }
       },

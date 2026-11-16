@@ -159,7 +159,7 @@ export default function GameScreen() {
       const timer = setTimeout(() => {
         const state = useGameStore.getState();
         if (state.phase === 'jeu' && state.tourDeJoueur === 0) {
-          state._faireProchaineActionIA();
+          state._programmerActionIA();
         }
       }, 500);
       return () => clearTimeout(timer);
